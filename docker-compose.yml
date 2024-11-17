@@ -4,11 +4,13 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - "3005:3005"
     environment:
       - BACKEND_URL=http://localhost:8000
     depends_on:
       - backend
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   backend:
     build:
@@ -17,6 +19,8 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - FRONTEND_URL=http://localhost:3000
+      - FRONTEND_URL=http://localhost:3005
     volumes:
       - ./data:/app/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

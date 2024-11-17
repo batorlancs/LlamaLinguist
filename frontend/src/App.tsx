@@ -7,14 +7,22 @@ function App() {
   const [response, setResponse] = useState('')
 
   const fetchHello = async () => {
-    const response = await fetch('http://localhost:8000/', {
-      mode: 'cors',
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    })
-    const data = await response.json()
-    setResponse(data.message)
+        try {
+            const response = await fetch('http://localhost:8000/generate', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                credentials: 'include',
+                mode: 'cors'
+            })
+            const data = await response.json()
+            setResponse(data.response)
+        } catch (error) {
+            console.error('Error fetching:', error)
+            setResponse('Error fetching response')
+        }
   }
 
   return (

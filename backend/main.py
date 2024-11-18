@@ -1,4 +1,5 @@
 import requests
+import sys
 from typing import Union
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -6,7 +7,13 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 # ollama_host = "http://localhost:11434"
-ollama_host = "http://host.docker.internal:11434"
+
+IS_DEV = "dev" in sys.argv
+
+if IS_DEV:
+    ollama_host = "http://localhost:11434"
+else:
+    ollama_host = "http://host.docker.internal:11434"
 
 # Add CORS middleware configuration
 app.add_middleware(

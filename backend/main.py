@@ -1,6 +1,7 @@
+from pydantic import BaseModel
 import requests
 import sys
-from typing import Union
+from typing import List, Union
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -28,14 +29,51 @@ app.add_middleware(
 async def read_root():
     return {"message": "Hello World"}
 
-@app.get("/generate")
-async def generate():
-    print(f"Generating response from {ollama_host}")
-    fetched_response = requests.post(f"{ollama_host}/api/generate", json={"model": "llama3.2:1b", "prompt": "Hello, how are you?", "stream": False})
+class GenerateRequest(BaseModel):
+    prompt: str
+    model: str
+
+@app.post("/generate")
+async def generate(request: GenerateRequest):
+    print(f"Generating response from {ollama_host}, prompt: {request.prompt}")
+    fetched_response = requests.post(
+        f"{ollama_host}/api/generate",
+        json={"model": request.model, "prompt": request.prompt, "stream": False}
+    )
     response_text = fetched_response.json()["response"]
     print(f"Response from {ollama_host}: {response_text}")
     return {"response": response_text, "status": "success"}
 
-@app.get("/items/{item_id}")
-async def read_item(item_id: int, q: Union[str, None] = None):
-    return {"item_id": item_id, "q": q}
+class Message(BaseModel):
+    role: str
+    content: str
+    
+    def to_dict(self):
+        return {
+            "role": self.role,
+            "content": self.content
+        }
+
+class ChatRequest(BaseModel):
+    messages: List[Message]
+    model: str
+    
+    def to_dict(self):
+        return {
+            "model": self.model,
+            "messages": [{"role": "system", "content": "You are a helpful assistant."}] + [message.to_dict() for message in self.messages],
+            "stream": False
+        }
+
+@app.post("/chat")
+async def chat(request: ChatRequest):
+    print(f"Generating response from {ollama_host}, messages length: {len(request.messages)}")
+    print(request.to_dict())
+    fetched_response = requests.post(
+        f"{ollama_host}/api/chat",
+        json=request.to_dict()
+    )
+    response_text = fetched_response.json()["message"]["content"]
+    print(f"Response from {ollama_host}: {response_text}")
+    return {"response": response_text, "status": "success"}
+

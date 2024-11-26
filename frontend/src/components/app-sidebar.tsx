@@ -18,7 +18,7 @@ import {
 	SidebarMenuSubButton,
 	SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
-// This is sample data.
+
 const data = {
 	navMain: [
 		{
@@ -158,7 +158,45 @@ const data = {
 		},
 	],
 };
+
+// type Conversation = {
+// 	id: number;
+// 	title: string;
+// 	created_at: string;
+// 	updated_at: string;
+// 	assistant: {
+// 		id: number;
+// 		name: string;
+// 		model: string;
+// 	};
+// };
+
+
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+
+	React.useEffect(() => {
+		const fetchConversations = async () => {
+			try {
+				const response = await fetch("http://localhost:8000/conversations", {
+					method: "GET",
+                    headers: {
+						"Content-Type": "application/json",
+						Accept: "application/json",
+					},
+					credentials: "include",
+					mode: "cors",
+				});
+				const data = await response.json();
+				console.log(`data: ${JSON.stringify(data)}`);
+			} catch (error) {
+				console.error("Error fetching conversations:", error);
+			}
+		};
+
+		fetchConversations();
+	}, []);
+
+
 	return (
 		<Sidebar {...props}>
 			<SidebarHeader>

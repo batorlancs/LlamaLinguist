@@ -1,35 +1,38 @@
+# Load environment variables before anything else
+from dotenv import load_dotenv
+load_dotenv()
+
+
+from auth import setup_auth, get_password_hash
 import os
 from pydantic import BaseModel
 import requests
 import sys
-from typing import List
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine, select
 from sqlmodel import SQLModel, Session
-from dotenv import load_dotenv
-from database.schema.schema import Assistant, Conversation, User, Message as MessageSchema
+from database.database import Database
+from database.schema.schema import Assistant, Message as ChatMessage, Conversation, User
 
-load_dotenv()
+
 app = FastAPI()
-# ollama_host = "http://localhost:11434"
+setup_auth(app)
 
-IS_DEV = "dev" in sys.argv
 
-ollama_host = os.getenv("OLLAMA_URL")
+# Check if running in dev mode or with localhost/IP host
+IS_DEV = "dev" in sys.argv or any(arg in ["localhost", "127.0.0.1"] for arg in sys.argv)
+ollama_url = os.getenv("OLLAMA_URL")
+frontend_url = os.getenv("FRONTEND_URL")
 
 # Add CORS middleware configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[os.getenv("FRONTEND_URL")],
+    allow_origins=["*" if IS_DEV else frontend_url],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-@app.get("/")
-async def read_root():
-    return {"message": "Hello World"}
 
 class GenerateRequest(BaseModel):
     prompt: str
@@ -37,136 +40,143 @@ class GenerateRequest(BaseModel):
 
 @app.post("/generate")
 async def generate(request: GenerateRequest):
-    print(f"Generating response from {ollama_host}, prompt: {request.prompt}")
+    print(f"Generating response from {ollama_url}, prompt: {request.prompt}")
     fetched_response = requests.post(
-        f"{ollama_host}/api/generate",
+        f"{ollama_url}/api/generate",
         json={"model": request.model, "prompt": request.prompt, "stream": False}
     )
     response_text = fetched_response.json()["response"]
-    print(f"Response from {ollama_host}: {response_text}")
+    print(f"Response from {ollama_url}: {response_text}")
     return {"response": response_text, "status": "success"}
 
-class Message(BaseModel):
-    role: str
-    content: str
-    
-    def to_dict(self):
-        return {
-            "role": self.role,
-            "content": self.content
-        }
+########################################################
+# Base Routes
+########################################################
 
-class ChatRequest(BaseModel):
-    messages: List[Message]
-    model: str
-    
-    def to_dict(self):
-        return {
-            "model": self.model,
-            "messages": [{"role": "system", "content": "You are a helpful assistant."}] + [message.to_dict() for message in self.messages],
-            "stream": False
-        }
+@app.get("/")
+async def read_root():
+    return {"message": "Hello World"}
 
-@app.post("/chat")
-async def chat(request: ChatRequest):
-    print(f"Generating response from {ollama_host}, messages length: {len(request.messages)}")
-    print(request.to_dict())
-    fetched_response = requests.post(
-        f"{ollama_host}/api/chat",
-        json=request.to_dict()
-    )
-    response_text = fetched_response.json()["message"]["content"]
-    print(f"Response from {ollama_host}: {response_text}")
-    return {"response": response_text, "status": "success"}
+@app.get("/ping")
+async def ping():
+    return {"message": "pong"}
 
+
+########################################################
+# User Routes
+########################################################
+
+# @app.post("/chat")
+# async def chat(request: ChatRequest):
+#     print(f"Generating response from {ollama_url}, messages length: {len(request.messages)}")
+#     print(request.to_dict())
+#     fetched_response = requests.post(
+#         f"{ollama_url}/api/chat",
+#         json=request.to_dict()
+#     )
+#     response_text = fetched_response.json()["message"]["content"]
+#     print(f"Response from {ollama_url}: {response_text}")
+#     return {"response": response_text, "status": "success"}
 
 @app.get("/convo")
 async def convo():
-    engine = create_engine(os.getenv("DATABASE_URL"))
-    with Session(engine) as session:
-        # For now, get conversations for the sample user
-        user = session.exec(select(User).where(User.email == "user@example.com")).first()
+    with Database() as db:
+        user = db.get_user(email="user@example.com")
         if not user:
             return {"conversations": []}
             
-        # Get all conversations with related assistant info
-        conversations = session.exec(
-            select(Conversation, Assistant)
-            .join(Assistant, Conversation.assistant_id == Assistant.id)
-            .where(Conversation.user_id == user.id)
-            .order_by(Conversation.updated_at.desc())
-        ).all()
-        
-        return {
+        response = {"conversations": db.get_conversations(user)}
+        return response
+
+@app.get("/user")
+async def user():
+    with Database() as db:
+        user = db.get_user(email="user@example.com")
+        if not user:
+            return {"user": None}
+            
+        response = {
+            **user.model_dump(),
             "conversations": [
                 {
-                    "id": conv.id,
-                    "title": conv.title,
-                    "created_at": conv.created_at,
-                    "updated_at": conv.updated_at,
-                    "assistant": {
-                        "id": asst.id,
-                        "name": asst.name,
-                        "model": asst.model
-                    }
+                    **conversation.model_dump(exclude={"user_id", "assistant_id"}),
+                    "messages": [message.model_dump(exclude={"conversation_id"}) for message in conversation.messages],
+                    "assistant": conversation.assistant.model_dump()
                 }
-                for conv, asst in conversations
+                for conversation in user.conversations
             ]
         }
+        return response
+
+########################################################
+# Events
+########################################################
 
 @app.on_event("startup")
 async def startup_event():
-    # Create database tables
-    engine = create_engine(os.getenv("DATABASE_URL"))
-    # Drop all tables first to ensure clean state
-    SQLModel.metadata.drop_all(engine)
-    # Create all tables fresh
-    SQLModel.metadata.create_all(engine)
-
-    # Create sample data
-    with Session(engine) as session:
-        # Check if we already have data
-        if session.exec(select(User)).first() is None:
-            # Create sample user
-            user = User(
-                name="Sample User",
-                email="user@example.com"
-            )
-            session.add(user)
-            session.commit()
-
-            # Create sample assistant
-            assistant = Assistant(
-                name="Claude",
-                model="claude-2"
-            )
-            session.add(assistant)
-            session.commit()
-
-            # Create sample conversation
-            conversation = Conversation(
-                user_id=user.id,
-                assistant_id=assistant.id,
-                title="First Conversation"
-            )
-            session.add(conversation)
-            session.commit()
-
-            # Add sample messages
-            messages = [
-                MessageSchema(
-                    conversation_id=conversation.id,
+    with Database() as db:
+        # Drop all tables first to ensure clean state
+        SQLModel.metadata.drop_all(db.engine)
+        # Create all tables fresh
+        SQLModel.metadata.create_all(db.engine)
+        
+        # create user
+        user = User(
+            name="user",
+            email="user@example.com",
+            hashed_password=get_password_hash("password"),
+        )
+        db.create_user(user)
+        db.session.refresh(user)
+        
+        # create assistant
+        assistant = Assistant(
+            name="Gerald",
+            model="llama3.2:1b",
+            user_id=user.id
+        )
+        db.create_assistant(assistant)
+        db.session.refresh(assistant)
+        
+        # create conversation
+        conversation = Conversation(
+            user_id=user.id,
+            assistant_id=assistant.id,
+            title="First Conversation",
+            messages=[
+                ChatMessage(
                     role="user",
                     content="Hello! How are you?"
                 ),
-                MessageSchema(
-                    conversation_id=conversation.id,
-                    role="assistant", 
+                ChatMessage(
+                    role="assistant",
                     content="I'm doing well, thank you! How can I help you today?"
                 )
             ]
-            
-            for message in messages:
-                print(message)
-                session.add(message)
-            session.commit()
+        )
+        db.create_conversation(conversation)
+        
+        conversation2 = Conversation(
+            user_id=user.id,
+            assistant_id=assistant.id,
+            title="Second Conversation",
+            messages=[
+                ChatMessage(
+                    role="user",
+                    content="What is the weather in Tokyo?"
+                ),
+                ChatMessage(
+                    role="assistant",
+                    content="The weather in Tokyo is currently sunny with a temperature of 75 degrees Fahrenheit."
+                ),
+                ChatMessage(
+                    role="user",
+                    content="Oh, that's great! Thank you!"
+                ),
+                ChatMessage(
+                    role="assistant",
+                    content="You're welcome! If you have any other questions, feel free to ask."
+                )
+            ]
+        )
+        db.create_conversation(conversation2)

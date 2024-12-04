@@ -1,24 +1,23 @@
 # Load environment variables before anything else
+from typing import Annotated
 from dotenv import load_dotenv
 load_dotenv()
 
-
-from auth import setup_auth, get_password_hash
+from utils.ollama import Ollama, OllamaMessage
+from app_logging.app_logging import Logger
+from auth import get_current_active_user, setup_auth, get_password_hash
 import os
 from pydantic import BaseModel
-import requests
 import sys
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import create_engine, select
 from sqlmodel import SQLModel, Session
 from database.database import Database
 from database.schema.schema import Assistant, Message as ChatMessage, Conversation, User
 
-
 app = FastAPI()
 setup_auth(app)
-
 
 # Check if running in dev mode or with localhost/IP host
 IS_DEV = "dev" in sys.argv or any(arg in ["localhost", "127.0.0.1"] for arg in sys.argv)
@@ -33,21 +32,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-class GenerateRequest(BaseModel):
-    prompt: str
-    model: str
-
-@app.post("/generate")
-async def generate(request: GenerateRequest):
-    print(f"Generating response from {ollama_url}, prompt: {request.prompt}")
-    fetched_response = requests.post(
-        f"{ollama_url}/api/generate",
-        json={"model": request.model, "prompt": request.prompt, "stream": False}
-    )
-    response_text = fetched_response.json()["response"]
-    print(f"Response from {ollama_url}: {response_text}")
-    return {"response": response_text, "status": "success"}
 
 ########################################################
 # Base Routes
@@ -66,47 +50,106 @@ async def ping():
 # User Routes
 ########################################################
 
-# @app.post("/chat")
-# async def chat(request: ChatRequest):
-#     print(f"Generating response from {ollama_url}, messages length: {len(request.messages)}")
-#     print(request.to_dict())
-#     fetched_response = requests.post(
-#         f"{ollama_url}/api/chat",
-#         json=request.to_dict()
-#     )
-#     response_text = fetched_response.json()["message"]["content"]
-#     print(f"Response from {ollama_url}: {response_text}")
-#     return {"response": response_text, "status": "success"}
+class GenerateRequest(BaseModel):
+    model: str
+    message: str
 
-@app.get("/convo")
-async def convo():
-    with Database() as db:
-        user = db.get_user(email="user@example.com")
-        if not user:
-            return {"conversations": []}
-            
-        response = {"conversations": db.get_conversations(user)}
-        return response
+@app.post("/generate")
+async def generate(
+    request: GenerateRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+):
+    Logger.debug(app, f"Generate request from user {current_user.name}: {request}")
+    response = Ollama.generate(request.model, request.message)
+    return {"response": response, "status": "success"}
 
-@app.get("/user")
-async def user():
+class ChatRequest(BaseModel):
+    model: str
+    message: str
+    conversation_id: int
+
+@app.post("/chat")
+async def chat(
+    request: ChatRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+):
+    Logger.debug(app, f"Chat request from user {current_user.name}: {request}")
     with Database() as db:
-        user = db.get_user(email="user@example.com")
-        if not user:
-            return {"user": None}
+        conversation = db.get_conversation_by_id(request.conversation_id)
+        if not conversation:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        
+        if conversation.user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="User does not have access to this conversation")
+        
+        # Convert conversation messages to Ollama format
+        messages = [
+            OllamaMessage(
+                role="assistant" if msg.role == "assistant" else "user",
+                content=msg.content
+            )
+            for msg in conversation.messages
+        ]
+        
+        messages.append(OllamaMessage(role="user", content=request.message))
+        response = Ollama.chat(request.model, messages)
+        
+        # Add response to conversation
+        conversation.messages.append(ChatMessage(role="assistant", content=response))
+        db.session.commit()
+         
+        return {"response": response, "status": "success"}
+
+
+@app.get("/conversations")
+async def conversations(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+):
+    with Database() as db:
+        conversations = db.get_conversations(current_user)
+        return {"conversations": conversations }
+
+
+class CreateConversationRequest(BaseModel):
+    title: str
+    assistant_id: int
+    model: str
+
+@app.post("/conversations")
+async def create_conversation(
+    request: CreateConversationRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+):
+    Logger.debug(app, f"Create conversation request from user {current_user.name}: {request}")
+    with Database() as db:
+        conversation = Conversation(
+            title=request.title,
+            user_id=current_user.id,
+            assistant_id=request.assistant_id
+        )
+        conversation = db.create_conversation(conversation)
+        return {"conversation": conversation}
+
+
+# @app.get("/user")
+# async def user():
+#     with Database() as db:
+#         user = db.get_user(email="user@example.com")
+#         if not user:
+#             return {"user": None}
             
-        response = {
-            **user.model_dump(),
-            "conversations": [
-                {
-                    **conversation.model_dump(exclude={"user_id", "assistant_id"}),
-                    "messages": [message.model_dump(exclude={"conversation_id"}) for message in conversation.messages],
-                    "assistant": conversation.assistant.model_dump()
-                }
-                for conversation in user.conversations
-            ]
-        }
-        return response
+#         response = {
+#             **user.model_dump(),
+#             "conversations": [
+#                 {
+#                     **conversation.model_dump(exclude={"user_id", "assistant_id"}),
+#                     "messages": [message.model_dump(exclude={"conversation_id"}) for message in conversation.messages],
+#                     "assistant": conversation.assistant.model_dump()
+#                 }
+#                 for conversation in user.conversations
+#             ]
+#         }
+#         return response
 
 ########################################################
 # Events
@@ -114,6 +157,10 @@ async def user():
 
 @app.on_event("startup")
 async def startup_event():
+    if not IS_DEV:
+        return
+    
+    Logger.warning(app, "Running in dev mode!")
     with Database() as db:
         # Drop all tables first to ensure clean state
         SQLModel.metadata.drop_all(db.engine)

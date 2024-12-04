@@ -33,9 +33,7 @@ class SolveBugBcryptWarning:
     __version__: str = getattr(bcrypt, "__version__")
     
 setattr(bcrypt, "__about__", SolveBugBcryptWarning())
-
 pwd_context = CryptContext(schemes=["bcrypt"])
-
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 

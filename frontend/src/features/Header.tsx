@@ -11,6 +11,9 @@ import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 
 export const Header = () => {
+
+	const id = window.location.pathname.split('/').pop();
+
 	return (
 		<header className="w-full flex sticky z-50 top-0 bg-background h-16 shrink-0 items-center rounded-t-xl justify-between px-4">
 			<div className="flex items-center gap-2">
@@ -20,12 +23,12 @@ export const Header = () => {
                     <BreadcrumbList>
                         <BreadcrumbItem className="hidden md:block">
                             <BreadcrumbLink href="#">
-                                Building Your Application
+                                Conversation
                             </BreadcrumbLink>
                         </BreadcrumbItem>
                         <BreadcrumbSeparator className="hidden md:block" />
                         <BreadcrumbItem>
-                            <BreadcrumbPage>Data Fetching</BreadcrumbPage>
+                            <BreadcrumbPage>{id}</BreadcrumbPage>
                         </BreadcrumbItem>
                     </BreadcrumbList>
                 </Breadcrumb>

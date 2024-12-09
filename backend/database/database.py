@@ -69,12 +69,28 @@ class Database:
     ###########################################################################
     # Assistant operations
     ###########################################################################
+    
+    def get_assistants(self, user: User) -> List[Assistant]:
+        """Retrieve all assistants for a given user."""
+        statement = select(Assistant).where(Assistant.user_id == user.id)
+        return self.session.exec(statement).all()
+    
     def create_assistant(self, assistant: Assistant) -> Assistant:
         """Create a new assistant record."""
         self.session.add(assistant)
         self.session.commit()
         self.session.refresh(assistant)
         return assistant
+    
+    def get_assistant_by_id(self, assistant_id: int) -> Assistant | None:
+        """Retrieve a specific assistant by its ID."""
+        statement = select(Assistant).where(Assistant.id == assistant_id)
+        return self.session.exec(statement).first()
+
+    def delete_assistant(self, assistant: Assistant) -> None:
+        """Delete an assistant record."""
+        self.session.delete(assistant)
+        self.session.commit()
 
     ###########################################################################
     # Message operations

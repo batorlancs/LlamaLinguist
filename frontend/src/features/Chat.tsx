@@ -1,82 +1,85 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
+import { ConversationDetails } from "@/types/api/responses";
+import { api } from "@/utils/api";
 import { Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
 
 type Chat = {
 	role: "user" | "assistant";
 	content: string;
 };
 
+
 export const Chat = () => {
-	const [chat, setChat] = useState<Chat[]>([]);
+    const [conversation, setConversation] = useState<ConversationDetails | null>(null);
+    const [chat, setChat] = useState<Chat[]>([]);
 	const [input, setInput] = useState("");
 	const [isLoading, setIsLoading] = useState(false);
+    const id = window.location.pathname.split('/').pop();
 
-	const fetchChatResponse = async (messages: Chat[]): Promise<Chat[]> => {
+    useEffect(() => {
+        const fetchConversation = async () => {
+            if (!id) return;
+            
+            try {
+                const response = await api<ConversationDetails>(`/conversation/${id}`);
+                setConversation(response);
+                setChat(response.messages);
+            } catch (error) {
+                console.error("Error fetching conversation:", error);
+            }
+        };
+
+        fetchConversation();
+    }, [id]);
+
+    const addMessageToConversation = (message: Chat) => {
+        if (!conversation) return;
+        setChat(prevChat => [...prevChat, message]);
+    }
+
+	const fetchChatResponse = async (message: string): Promise<string> => {
 		try {
-			const response = await fetch("http://localhost:8000/chat", {
+			const data = await api<{ response: string }>("/chat", {
 				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-					Accept: "application/json",
-				},
-				body: JSON.stringify({
-					messages,
+				body: {
+					message,
 					model: "llama3.2:3b",
-				}),
-				credentials: "include",
-				mode: "cors",
+                    conversation_id: id,
+				}
 			});
-
-			const data = await response.json();
-
-			console.log(data);
-
-			if (!response.ok || !data) {
-				throw new Error("Failed to get response");
-			}
-
-			return [
-				...messages,
-				{
-					role: "assistant",
-					content: data.response,
-				},
-			];
+            return data.response;
 		} catch (error) {
 			console.error("Error fetching:", error);
-			return [
-				...messages,
-				{
-					role: "assistant",
-					content: "Error fetching response :(",
-				},
-			];
+			return "Error fetching response :(";
 		}
 	};
 
 	const handleSubmit = async (e: React.KeyboardEvent<HTMLInputElement>) => {
 		if (e.key !== "Enter") return;
 
-		const userMessage = {
-			role: "user" as const,
-			content: input,
-		};
-
 		setInput("");
 		setIsLoading(true);
 
-		const currChat = [...chat, userMessage];
-		setChat(currChat);
-		const newChat = await fetchChatResponse(currChat);
-		setChat(newChat);
+		addMessageToConversation({
+            role: "user",
+            content: input
+        });
+
+		const reply = await fetchChatResponse(input);
+        addMessageToConversation({
+            role: "assistant",
+            content: reply
+        });
+
 		setIsLoading(false);
 	};
 
 	return (
 		<>
-			<div className="h-full w-full max-w-5xl px-12 py-12">
+			<div className="h-full w-full max-w-4xl px-12 py-12">
 				{chat.map((message, index) =>
 					message.role === "user" ? (
 						<div key={index} className="flex justify-end mt-8">
@@ -117,10 +120,10 @@ export const Chat = () => {
 					</div>
 				)}
 			</div>
-			<div className="w-full max-w-5xl sticky bottom-0 bg-background px-12 py-8">
+			<div className="w-full max-w-4xl sticky bottom-0 bg-background px-12 py-8 rounded-b-xl">
 				<Input
 					placeholder="Ask me anything"
-					className="h-12"
+					className="h-12 rounded-xl"
 					onKeyDown={handleSubmit}
 					value={input}           
 					onChange={(e) => setInput(e.target.value)}

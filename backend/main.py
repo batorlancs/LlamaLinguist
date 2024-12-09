@@ -82,6 +82,8 @@ async def chat(
         if conversation.user_id != current_user.id:
             raise HTTPException(status_code=403, detail="User does not have access to this conversation")
         
+        conversation.messages.append(ChatMessage(role="user", content=request.message))
+        
         # Convert conversation messages to Ollama format
         messages = [
             OllamaMessage(
@@ -101,13 +103,30 @@ async def chat(
         return {"response": response, "status": "success"}
 
 
+########################################################
+# Conversation Routes
+########################################################
+
 @app.get("/conversations")
 async def conversations(
     current_user: Annotated[User, Depends(get_current_active_user)],
 ):
     with Database() as db:
         conversations = db.get_conversations(current_user)
-        return {"conversations": conversations }
+        return conversations
+    
+@app.get("/conversation/{conversation_id}")
+async def get_conversation(
+    conversation_id: int,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+):
+    with Database() as db:
+        conversation = db.get_conversation_by_id(conversation_id)
+        return {
+            **conversation.model_dump(exclude={"user_id", "assistant_id"}),
+            "messages": [message.model_dump(exclude={"conversation_id"}) for message in conversation.messages],
+            "assistant": conversation.assistant.model_dump()
+        }
 
 
 class CreateConversationRequest(BaseModel):
@@ -115,7 +134,7 @@ class CreateConversationRequest(BaseModel):
     assistant_id: int
     model: str
 
-@app.post("/conversations")
+@app.post("/conversation")
 async def create_conversation(
     request: CreateConversationRequest,
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -128,7 +147,97 @@ async def create_conversation(
             assistant_id=request.assistant_id
         )
         conversation = db.create_conversation(conversation)
-        return {"conversation": conversation}
+        return conversation
+    
+@app.delete("/conversation/{conversation_id}")
+async def delete_conversation(
+    conversation_id: int,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+):
+    with Database() as db:
+        db.delete_conversation(conversation_id)
+        return {"status": "success"}
+
+
+########################################################
+# Assistant Routes
+########################################################
+
+@app.get("/assistants")
+async def get_assistants(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+):
+    """Get all assistants for the current user"""
+    with Database() as db:
+        assistants = db.get_assistants(current_user)
+        return assistants
+
+
+class CreateAssistantRequest(BaseModel):
+    name: str
+    model: str
+
+@app.post("/assistant")
+async def create_assistant(
+    request: CreateAssistantRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+):
+    """Create a new assistant"""
+    Logger.debug(app, f"Create assistant request from user {current_user.name}: {request}")
+    with Database() as db:
+        assistant = Assistant(
+            name=request.name,
+            model=request.model,
+            user_id=current_user.id
+        )
+        assistant = db.create_assistant(assistant)
+        return assistant
+
+
+@app.delete("/assistant/{assistant_id}")
+async def delete_assistant(
+    assistant_id: int,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+):
+    """Delete an assistant"""
+    Logger.debug(app, f"Delete assistant request from user {current_user.name}: {assistant_id}")
+    with Database() as db:
+        assistant = db.get_assistant_by_id(assistant_id)
+        if not assistant:
+            raise HTTPException(status_code=404, detail="Assistant not found")
+        
+        if assistant.user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="User does not have access to this assistant")
+        
+        db.delete_assistant(assistant)
+        return {"status": "success"}
+
+
+class UpdateAssistantRequest(BaseModel):
+    name: str
+    model: str
+
+@app.put("/assistant/{assistant_id}")
+async def update_assistant(
+    assistant_id: int,
+    request: UpdateAssistantRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+):
+    """Update an assistant"""
+    Logger.debug(app, f"Update assistant request from user {current_user.name}: {request}")
+    with Database() as db:
+        assistant = db.get_assistant_by_id(assistant_id)
+        if not assistant:
+            raise HTTPException(status_code=404, detail="Assistant not found")
+        
+        if assistant.user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="User does not have access to this assistant")
+        
+        assistant.name = request.name
+        assistant.model = request.model
+        db.session.commit()
+        db.session.refresh(assistant)
+        return assistant.model_dump()
 
 
 # @app.get("/user")
@@ -193,12 +302,12 @@ async def startup_event():
             messages=[
                 ChatMessage(
                     role="user",
-                    content="Hello! How are you?"
+                    content="If x = 2, what is x^2?"
                 ),
                 ChatMessage(
                     role="assistant",
-                    content="I'm doing well, thank you! How can I help you today?"
-                )
+                    content="It is 4"
+                ),
             ]
         )
         db.create_conversation(conversation)

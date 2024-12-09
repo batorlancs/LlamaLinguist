@@ -18,176 +18,81 @@ import {
 	SidebarMenuSubButton,
 	SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
+import { api } from "@/utils/api";
+import { Conversation } from "@/types/api/responses";
 
-const data = {
-	navMain: [
-		{
-			title: "Getting Started",
-			url: "#",
-			items: [
-				{
-					title: "Installation",
-					url: "#",
-				},
-				{
-					title: "Project Structure",
-					url: "#",
-				},
-			],
-		},
-		{
-			title: "Building Your Application",
-			url: "#",
-			items: [
-				{
-					title: "Routing",
-					url: "#",
-				},
-				{
-					title: "Data Fetching",
-					url: "#",
-					isActive: true,
-				},
-				{
-					title: "Rendering",
-					url: "#",
-				},
-				{
-					title: "Caching",
-					url: "#",
-				},
-				{
-					title: "Styling",
-					url: "#",
-				},
-				{
-					title: "Optimizing",
-					url: "#",
-				},
-				{
-					title: "Configuring",
-					url: "#",
-				},
-				{
-					title: "Testing",
-					url: "#",
-				},
-				{
-					title: "Authentication",
-					url: "#",
-				},
-				{
-					title: "Deploying",
-					url: "#",
-				},
-				{
-					title: "Upgrading",
-					url: "#",
-				},
-				{
-					title: "Examples",
-					url: "#",
-				},
-			],
-		},
-		{
-			title: "API Reference",
-			url: "#",
-			items: [
-				{
-					title: "Components",
-					url: "#",
-				},
-				{
-					title: "File Conventions",
-					url: "#",
-				},
-				{
-					title: "Functions",
-					url: "#",
-				},
-				{
-					title: "next.config.js Options",
-					url: "#",
-				},
-				{
-					title: "CLI",
-					url: "#",
-				},
-				{
-					title: "Edge Runtime",
-					url: "#",
-				},
-			],
-		},
-		{
-			title: "Architecture",
-			url: "#",
-			items: [
-				{
-					title: "Accessibility",
-					url: "#",
-				},
-				{
-					title: "Fast Refresh",
-					url: "#",
-				},
-				{
-					title: "Next.js Compiler",
-					url: "#",
-				},
-				{
-					title: "Supported Browsers",
-					url: "#",
-				},
-				{
-					title: "Turbopack",
-					url: "#",
-				},
-			],
-		},
-		{
-			title: "Community",
-			url: "#",
-			items: [
-				{
-					title: "Contribution Guide",
-					url: "#",
-				},
-			],
-		},
-	],
-};
+interface NavItem {
+	title: string;
+	url: string;
+    isActive: boolean;
+}
 
-// type Conversation = {
-// 	id: number;
-// 	title: string;
-// 	created_at: string;
-// 	updated_at: string;
-// 	assistant: {
-// 		id: number;
-// 		name: string;
-// 		model: string;
-// 	};
+interface NavSection {
+	title: string;
+	url: string;
+	items: NavItem[];
+}
+
+interface NavData {
+	navMain: NavSection[];
+}
+
+// const data: NavData = {
+// 	navMain: [
+// 		{
+// 			title: "Getting Started",
+// 			url: "#",
+// 			items: [
+// 				{
+// 					title: "Installation",
+// 					url: "#",
+// 				},
+// 				{
+// 					title: "Project Structure", 
+// 					url: "#",
+// 				},
+// 			],
+// 		},
+// 	],
 // };
 
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
+    const [data, setData] = React.useState<NavData>({
+        navMain: []
+    });
+
 	React.useEffect(() => {
 		const fetchConversations = async () => {
 			try {
-				const response = await fetch("http://localhost:8000/conversations", {
-					method: "GET",
-                    headers: {
-						"Content-Type": "application/json",
-						Accept: "application/json",
-					},
-					credentials: "include",
-					mode: "cors",
-				});
-				const data = await response.json();
-				console.log(`data: ${JSON.stringify(data)}`);
+				const conversations = await api<Conversation[]>("/conversations");
+                console.log(conversations)
+                
+                // group the conversations by assistant_id
+                const groupedConversations = conversations.reduce<Record<number, Conversation[]>>((acc, conversation) => {
+                    if (!acc[conversation.assistant_id]) {
+                        acc[conversation.assistant_id] = [];
+                    }
+                    acc[conversation.assistant_id].push(conversation);
+                    return acc;
+                }, {});
+
+                console.log(groupedConversations)
+
+                // Convert the grouped conversations into the NavData format
+                const navMain = Object.entries(groupedConversations).map(([assistantId, conversations]) => ({
+                    title: `Assistant ${assistantId}`,
+                    url: "#",
+                    items: conversations.map((conv) => ({
+                        title: conv.title,
+                        url: `/chat/${conv.id}`,
+                        isActive: false,
+                    })),
+                }));
+
+                setData({ navMain });
+
 			} catch (error) {
 				console.error("Error fetching conversations:", error);
 			}

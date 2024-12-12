@@ -1,46 +1,58 @@
+import { AuthService } from "./auth";
+import { HttpError, NoAccessTokenError, UnauthorizedError } from "./errors";
+import { RequestOptions } from "./types";
+
 const API_URL = import.meta.env.BACKEND_URL || "http://localhost:8000";
 
-type RequestMethod = "GET" | "POST" | "PUT" | "DELETE";
-
-interface RequestOptions {
-	method?: RequestMethod;
-	body?: Record<string, unknown>;
-	headers?: Record<string, string>;
-}
-
 export const api = async <T>(
-	endpoint: string,
-	options: RequestOptions = {}
+    endpoint: string,
+    options: RequestOptions = {},
+    retry: boolean = true
 ): Promise<T> => {
-	const { method = "GET", body, headers = {} } = options;
+    const { method = "GET", body, headers = {} } = options;
 
-	const requestOptions: RequestInit = {
-		method,
-		headers: {
-			"Content-Type": "application/json",
-			"Accept": "application/json",
-			"Authorization": `Bearer ${localStorage.getItem("access_token")}`,
-			...headers,
-		},
-		credentials: "include",
-		mode: "cors",
-	};
+    async function executeRequest(): Promise<Response> {
+        const accessToken = localStorage.getItem("access_token");
+        if (!accessToken) {
+            throw new NoAccessTokenError();
+        }
 
-	if (body) {
-		requestOptions.body = JSON.stringify(body);
-	}
+        const requestOptions: RequestInit = {
+            method,
+            headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+                Authorization: `Bearer ${accessToken}`,
+                ...headers,
+            },
+            credentials: "include",
+            mode: "cors",
+        };
 
-	try {
-		const response = await fetch(`${API_URL}${endpoint}`, requestOptions);
+        if (body) {
+            requestOptions.body = JSON.stringify(body);
+        }
 
-		if (!response.ok) {
-			throw new Error(`HTTP error! status: ${response.status}`);
-		}
+        const response = await fetch(`${API_URL}${endpoint}`, requestOptions);
+        // Handle errors
+        if (response.status === 401) throw new UnauthorizedError();
+        if (!response.ok) throw new HttpError(response.status);
+        return response.json();
+    }
 
-		const data = await response.json();
-		return data as T;
-	} catch (error) {
-		console.error("API request failed:", error);
-		throw error;
-	}
+    try {
+        return (await executeRequest()) as T;
+    } catch (error) {
+        if (
+            error instanceof NoAccessTokenError ||
+            error instanceof UnauthorizedError
+        ) {
+            if (retry) {
+                await AuthService.refreshToken();
+                return await api(endpoint, options, retry);
+            }
+            throw error;
+        }
+        throw error;
+    }
 };

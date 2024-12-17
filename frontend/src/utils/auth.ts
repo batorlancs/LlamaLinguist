@@ -6,8 +6,7 @@ export class AuthService {
 
     static goToLogin(): void {
         if (window.location.pathname !== "/login") {
-            // window.location.href = "/login";
-            console.log("dude is not logged in");
+            window.location.href = "/login";
         }
     }
 
@@ -56,6 +55,8 @@ export class AuthService {
 
             return access_token;
         } catch (error) {
+            console.error("Error refreshing token", error);
+            this.goToLogin();
             throw error;
         } finally {
             this.isRefreshing = false;

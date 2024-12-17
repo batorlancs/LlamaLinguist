@@ -42,18 +42,20 @@ export function NavProjects({
             <SidebarGroupLabel>Conversations</SidebarGroupLabel>
             <SidebarMenu>
                 {projects.map((item) => (
-                    <SidebarMenuItem key={item.name}>
+                    <SidebarMenuItem key={item.id}>
                         <SidebarMenuButton
                             asChild
                             isActive={item.id.toString() === id}
-                            onClick={() => {
+                            onClick={(e) => {
+                                e.preventDefault();
                                 navigate(`/chat/${item.id}`);
                             }}
+                            className="cursor-pointer"
                         >
-                            <a href={item.url}>
+                            <div>
                                 <MessageCircle />
                                 <span>{item.name}</span>
-                            </a>
+                            </div>
                         </SidebarMenuButton>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>

@@ -50,48 +50,46 @@ type Project = {
 };
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-    const [projects, setProjects] = React.useState<Project[]>([]);
+    const [projects, setProjects] = React.useState<Project[]>(() => {
+        const cached = sessionStorage.getItem("projects");
+        try {
+            return cached ? JSON.parse(cached) : [];
+        } catch (error) {
+            console.error(
+                "Error parsing projects from session storage:",
+                error
+            );
+            return [];
+        }
+    });
 
     React.useEffect(() => {
         const fetchConversations = async () => {
             try {
-                // Check session storage first
-                const cachedProjects = sessionStorage.getItem("projects");
-                if (cachedProjects) {
-                    try {
-                        const parsedProjects = JSON.parse(cachedProjects);
-                        setProjects(parsedProjects);
-                        console.log("cachedProjects", parsedProjects);
-                        return;
-                    } catch (parseError) {
-                        console.error(
-                            "Error parsing cached projects:",
-                            parseError
-                        );
-                        // Continue to fetch fresh data if parsing fails
-                        sessionStorage.removeItem("projects");
-                    }
+                // Only fetch if we don't have projects
+                if (projects.length === 0) {
+                    const conversations =
+                        await api<Conversation[]>("/conversations");
+                    const newProjects = conversations.map((conversation) => ({
+                        id: conversation.id,
+                        name: conversation.title,
+                        url: `/chat/${conversation.id}`,
+                        icon: MessageCircle,
+                    }));
+
+                    sessionStorage.setItem(
+                        "projects",
+                        JSON.stringify(newProjects)
+                    );
+                    setProjects(newProjects);
                 }
-
-                const conversations =
-                    await api<Conversation[]>("/conversations");
-                console.log("conversations", conversations);
-                const projects = conversations.map((conversation) => ({
-                    id: conversation.id,
-                    name: conversation.title,
-                    url: `/chat/${conversation.id}`,
-                    icon: MessageCircle,
-                }));
-
-                // Save to session storage
-                sessionStorage.setItem("projects", JSON.stringify(projects));
-                setProjects(projects);
             } catch (error) {
                 console.error("Error fetching conversations:", error);
             }
         };
 
         fetchConversations();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     return (

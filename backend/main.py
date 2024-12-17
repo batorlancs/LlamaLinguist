@@ -3,16 +3,15 @@ from typing import Annotated
 from dotenv import load_dotenv
 load_dotenv()
 
+from config.Environment import Environment
 from utils.ollama import Ollama, OllamaMessage
 from app_logging.app_logging import Logger
 from auth import get_current_active_user, setup_auth, get_password_hash
 import os
 from pydantic import BaseModel
-import sys
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import create_engine, select
-from sqlmodel import SQLModel, Session
+from sqlmodel import SQLModel
 from database.database import Database
 from database.schema.schema import Assistant, Message as ChatMessage, Conversation, User
 
@@ -20,14 +19,13 @@ app = FastAPI()
 setup_auth(app)
 
 # Check if running in dev mode or with localhost/IP host
-IS_DEV = "dev" in sys.argv or any(arg in ["localhost", "127.0.0.1"] for arg in sys.argv)
 ollama_url = os.getenv("OLLAMA_URL")
 frontend_url = os.getenv("FRONTEND_URL")
 
 # Add CORS middleware configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*" if IS_DEV else frontend_url],
+    allow_origins=["*" if Environment.is_development() else frontend_url],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -264,9 +262,8 @@ async def update_assistant(
 # Events
 ########################################################
 
-@app.on_event("startup")
-async def startup_event():
-    if not IS_DEV:
+def create_tables_for_dev():
+    if not Environment.is_development():
         return
     
     Logger.warning(app, "Running in dev mode!")
@@ -336,3 +333,8 @@ async def startup_event():
             ]
         )
         db.create_conversation(conversation2)
+
+
+@app.on_event("startup")
+async def startup_event():
+    create_tables_for_dev()

@@ -117,10 +117,12 @@ export function NavUser({
                             </DropdownMenuItem>
                         </DropdownMenuGroup>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => {
-                            AuthService.logout()
-                            navigate("/login")  
-                        }}>
+                        <DropdownMenuItem
+                            onClick={() => {
+                                AuthService.logout();
+                                navigate("/login");
+                            }}
+                        >
                             <LogOut />
                             Log out
                         </DropdownMenuItem>

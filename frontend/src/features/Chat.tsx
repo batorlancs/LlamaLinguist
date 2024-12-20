@@ -4,7 +4,8 @@ import { ConversationDetails } from "@/types/api/responses";
 import { api } from "@/utils/api";
 import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Navigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
+import Markdown from "./Markdown";
 
 type Chat = {
     role: "user" | "assistant";
@@ -18,10 +19,6 @@ export const Chat = () => {
     const [input, setInput] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const { chatId: id } = useParams();
-
-    if (!id) {
-        return <Navigate to="/chat" replace />;
-    }
 
     useEffect(() => {
         const fetchConversation = async () => {
@@ -89,8 +86,10 @@ export const Chat = () => {
                 {chat?.map((message, index) =>
                     message.role === "user" ? (
                         <div key={index} className="flex justify-end mt-8">
-                            <div className="max-w-[80%] px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg">
-                                {message.content}
+                            <div className="max-w-[80%] px-4 py-2 bg-primary rounded-lg">
+                                <p className="prose text-primary-foreground text-sm">
+                                    {message.content}
+                                </p>
                             </div>
                         </div>
                     ) : (
@@ -103,8 +102,8 @@ export const Chat = () => {
                                     />
                                     <AvatarFallback>CN</AvatarFallback>
                                 </Avatar>
-                                <div className="max-w-[80%] bg-secondary rounded-lg px-4 py-2 text-sm">
-                                    {message.content}
+                                <div className="max-w-[100%] bg-secondary rounded-lg px-4 py-2 text-sm">
+                                    <Markdown message={message.content} />
                                 </div>
                             </div>
                         </div>

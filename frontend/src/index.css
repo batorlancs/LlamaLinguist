@@ -216,7 +216,7 @@
 }
 
 ::-webkit-scrollbar {
-    @apply w-2 h-2;
+    @apply w-3.5 h-3;
 }
 
 ::-webkit-scrollbar-track {
@@ -224,5 +224,9 @@
 }
 
 ::-webkit-scrollbar-thumb {
-    @apply rounded-full bg-border border-[1px] border-transparent border-solid bg-clip-padding;
+    @apply rounded-full bg-black bg-opacity-10 border-[3px] border-transparent border-solid bg-clip-padding dark:bg-white dark:bg-opacity-10 cursor-default;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    @apply bg-black bg-opacity-40 dark:bg-white dark:bg-opacity-20;
 }

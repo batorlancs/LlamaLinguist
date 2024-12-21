@@ -14,7 +14,7 @@ export const Header = () => {
     const id = window.location.pathname.split("/").pop();
 
     return (
-        <header className="w-full flex sticky z-50 top-0 bg-background h-16 shrink-0 items-center rounded-t-xl justify-between px-4">
+        <header className="w-full flex sticky z-50 top-0 bg-background h-16 shrink-0 items-center justify-between px-4">
             <div className="flex items-center gap-2">
                 <SidebarTrigger className="-ml-1" />
                 <Separator orientation="vertical" className="mr-2 h-4" />

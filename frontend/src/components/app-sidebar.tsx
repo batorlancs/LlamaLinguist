@@ -3,6 +3,7 @@ import {
     AudioWaveform,
     Command,
     GalleryVerticalEnd,
+    Loader2,
     MessageCircle,
 } from "lucide-react";
 import { NavProjects } from "./nav-projects";
@@ -16,6 +17,8 @@ import {
 } from "@/components/ui/sidebar";
 import { Conversation } from "@/types/api/responses";
 import { api } from "@/utils/api";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 const data = {
     user: {
@@ -40,57 +43,66 @@ const data = {
             plan: "Free",
         },
     ],
-    navMain: [],
 };
 
-type Project = {
+export type Project = {
     id: number;
     name: string;
     url: string;
 };
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-    const [projects, setProjects] = React.useState<Project[]>(() => {
-        const cached = sessionStorage.getItem("projects");
+    const [isLoading, setIsLoading] = useState(true);
+    const [projects, setProjects] = useState<Project[]>([]);
+    const navigate = useNavigate();
+
+    const fetchConversations = async () => {
         try {
-            return cached ? JSON.parse(cached) : [];
+            setIsLoading(true);
+            // await new Promise((resolve) => setTimeout(resolve, 1000));
+            const conversations = await api<Conversation[]>("/conversations");
+            const newProjects = conversations.map((conversation) => ({
+                id: conversation.id,
+                name: conversation.title,
+                url: `/chat/${conversation.id}`,
+                icon: MessageCircle,
+            }));
+
+            sessionStorage.setItem("projects", JSON.stringify(newProjects));
+            setProjects(newProjects);
         } catch (error) {
-            console.error(
-                "Error parsing projects from session storage:",
-                error
-            );
-            return [];
+            console.error("Error fetching conversations:", error);
+        } finally {
+            setIsLoading(false);
         }
-    });
+    };
 
-    React.useEffect(() => {
-        const fetchConversations = async () => {
-            try {
-                // Only fetch if we don't have projects
-                if (projects.length === 0) {
-                    const conversations =
-                        await api<Conversation[]>("/conversations");
-                    const newProjects = conversations.map((conversation) => ({
-                        id: conversation.id,
-                        name: conversation.title,
-                        url: `/chat/${conversation.id}`,
-                        icon: MessageCircle,
-                    }));
-
-                    sessionStorage.setItem(
-                        "projects",
-                        JSON.stringify(newProjects)
-                    );
-                    setProjects(newProjects);
-                }
-            } catch (error) {
-                console.error("Error fetching conversations:", error);
-            }
-        };
-
+    useEffect(() => {
         fetchConversations();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    const createConversation = async () => {
+        const conversation = await api<Conversation>("/conversation", {
+            method: "POST",
+            body: {
+                title: "New Conversation",
+                assistant_id: 1,
+            },
+        });
+        await fetchConversations();
+        navigate(`/chat/${conversation.id}`);
+    };
+
+    const deleteConversation = async (id: number) => {
+        await api<any>(`/conversation/${id}`, {
+            method: "DELETE",
+        });
+        await fetchConversations();
+    };
+
+    const editConversation = async (id: number) => {
+        console.log("editing project", id);
+    };
 
     return (
         <Sidebar {...props}>
@@ -98,8 +110,18 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 <TeamSwitcher teams={data.teams} />
             </SidebarHeader>
             <SidebarContent>
-                {/* <NavMain items={data.navMain} /> */}
-                <NavProjects projects={projects} />
+                {isLoading ? (
+                    <div className="flex items-center justify-center mt-10">
+                        <Loader2 className="animate-spin" />
+                    </div>
+                ) : (
+                    <NavProjects
+                        projects={projects}
+                        deleteConversation={deleteConversation}
+                        editConversation={editConversation}
+                        createConversation={createConversation}
+                    />
+                )}
             </SidebarContent>
             <SidebarFooter>
                 <NavUser user={data.user} />

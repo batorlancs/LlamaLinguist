@@ -1,8 +1,9 @@
 import {
-    Folder,
-    Forward,
+    HelpCircle,
     MessageCircle,
     MoreHorizontal,
+    Pencil,
+    Plus,
     Trash2,
 } from "lucide-react";
 
@@ -23,23 +24,39 @@ import {
     useSidebar,
 } from "@/components/ui/sidebar";
 import { useNavigate } from "react-router-dom";
+import { Project } from "./app-sidebar";
+import { Button } from "./ui/button";
+
+type NavProjectsProps = {
+    projects: Project[];
+    deleteConversation: (id: number) => void;
+    editConversation: (id: number) => void;
+    createConversation: () => void;
+};
 
 export function NavProjects({
     projects,
-}: {
-    projects: {
-        id: number;
-        name: string;
-        url: string;
-    }[];
-}) {
+    deleteConversation,
+    editConversation,
+    createConversation,
+}: NavProjectsProps) {
     const { isMobile } = useSidebar();
     const navigate = useNavigate();
     const id = window.location.pathname.split("/").pop();
 
     return (
-        <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-            <SidebarGroupLabel>Conversations</SidebarGroupLabel>
+        <SidebarGroup>
+            <SidebarGroupLabel className="flex items-center justify-between">
+                Conversations
+                <Button
+                    onClick={createConversation}
+                    className="h-5 w-5"
+                    size="icon"
+                    variant="outline"
+                >
+                    <Plus />
+                </Button>
+            </SidebarGroupLabel>
             <SidebarMenu>
                 {projects.map((item) => (
                     <SidebarMenuItem key={item.id}>
@@ -69,29 +86,33 @@ export function NavProjects({
                                 side={isMobile ? "bottom" : "right"}
                                 align={isMobile ? "end" : "start"}
                             >
-                                <DropdownMenuItem>
-                                    <Folder className="text-muted-foreground" />
-                                    <span>View Project</span>
+                                <DropdownMenuItem
+                                    onClick={() => deleteConversation(item.id)}
+                                >
+                                    <Trash2 className="text-muted-foreground" />
+                                    <span>Delete Conversation</span>
                                 </DropdownMenuItem>
-                                <DropdownMenuItem>
-                                    <Forward className="text-muted-foreground" />
-                                    <span>Share Project</span>
+                                <DropdownMenuItem
+                                    onClick={() => editConversation(item.id)}
+                                >
+                                    <Pencil className="text-muted-foreground" />
+                                    <span>Edit Conversation</span>
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem>
-                                    <Trash2 className="text-muted-foreground" />
-                                    <span>Delete Project</span>
+                                    <HelpCircle className="text-muted-foreground" />
+                                    <span>Help</span>
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </SidebarMenuItem>
                 ))}
-                <SidebarMenuItem>
+                {/* <SidebarMenuItem>
                     <SidebarMenuButton className="text-sidebar-foreground/70">
                         <MoreHorizontal className="text-sidebar-foreground/70" />
                         <span>More</span>
                     </SidebarMenuButton>
-                </SidebarMenuItem>
+                </SidebarMenuItem> */}
             </SidebarMenu>
         </SidebarGroup>
     );

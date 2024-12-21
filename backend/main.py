@@ -130,7 +130,6 @@ async def get_conversation(
 class CreateConversationRequest(BaseModel):
     title: str
     assistant_id: int
-    model: str
 
 @app.post("/conversation")
 async def create_conversation(
@@ -153,7 +152,7 @@ async def delete_conversation(
     current_user: Annotated[User, Depends(get_current_active_user)],
 ):
     with Database() as db:
-        db.delete_conversation(conversation_id)
+        db.delete_conversation_by_id(conversation_id)
         return {"status": "success"}
 
 
@@ -295,44 +294,62 @@ def create_tables_for_dev():
         conversation = Conversation(
             user_id=user.id,
             assistant_id=assistant.id,
-            title="First Conversation",
-            messages=[
-                ChatMessage(
-                    role="user",
-                    content="If x = 2, what is x^2?"
-                ),
-                ChatMessage(
-                    role="assistant",
-                    content="It is 4"
-                ),
-            ]
+            title="First Conversation"
         )
         db.create_conversation(conversation)
+        db.session.refresh(conversation)  # Add this line to get the conversation ID
+        
+        # Create messages after conversation is created
+        messages = [
+            ChatMessage(
+                role="user",
+                content="If x = 2, what is x^2?",
+                conversation_id=conversation.id  # Add conversation_id
+            ),
+            ChatMessage(
+                role="assistant",
+                content="It is 4",
+                conversation_id=conversation.id  # Add conversation_id
+            ),
+        ]
+        for message in messages:
+            db.session.add(message)
         
         conversation2 = Conversation(
             user_id=user.id,
             assistant_id=assistant.id,
-            title="Second Conversation",
-            messages=[
-                ChatMessage(
-                    role="user",
-                    content="What is the weather in Tokyo?"
-                ),
-                ChatMessage(
-                    role="assistant",
-                    content="The weather in Tokyo is currently sunny with a temperature of 75 degrees Fahrenheit."
-                ),
-                ChatMessage(
-                    role="user",
-                    content="Oh, that's great! Thank you!"
-                ),
-                ChatMessage(
-                    role="assistant",
-                    content="You're welcome! If you have any other questions, feel free to ask."
-                )
-            ]
+            title="Second Conversation"
         )
         db.create_conversation(conversation2)
+        db.session.refresh(conversation2)  # Add this line to get the conversation ID
+        
+        # Create messages after conversation is created
+        messages2 = [
+            ChatMessage(
+                role="user",
+                content="What is the weather in Tokyo?",
+                conversation_id=conversation2.id  # Add conversation_id
+            ),
+            ChatMessage(
+                role="assistant",
+                content="The weather in Tokyo is currently sunny with a temperature of 75 degrees Fahrenheit.",
+                conversation_id=conversation2.id  # Add conversation_id
+            ),
+            ChatMessage(
+                role="user",
+                content="Oh, that's great! Thank you!",
+                conversation_id=conversation2.id  # Add conversation_id
+            ),
+            ChatMessage(
+                role="assistant",
+                content="You're welcome! If you have any other questions, feel free to ask.",
+                conversation_id=conversation2.id  # Add conversation_id
+            )
+        ]
+        for message in messages2:
+            db.session.add(message)
+            
+        db.session.commit()
 
 
 @app.on_event("startup")

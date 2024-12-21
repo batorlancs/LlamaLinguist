@@ -65,6 +65,16 @@ class Database:
         """Retrieve all conversations for a given user."""
         statement = select(Conversation).where(Conversation.user_id == user.id)
         return self.session.exec(statement).all()
+        
+    def delete_conversation_by_id(self, conversation_id: int) -> None:
+        """Delete a conversation record and all its messages by the conversation ID."""
+        statement = select(Conversation).where(Conversation.id == conversation_id)
+        conversation = self.session.exec(statement).first()
+        if conversation:
+            for message in conversation.messages:
+                self.session.delete(message)
+            self.session.delete(conversation)
+            self.session.commit()
 
     ###########################################################################
     # Assistant operations

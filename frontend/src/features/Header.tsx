@@ -9,9 +9,23 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import { useEffect, useState } from "react";
 
 export const Header = () => {
-    const id = window.location.pathname.split("/").pop();
+    const [id, setId] = useState(window.location.pathname.split("/").pop());
+    useEffect(() => {
+        // Update ID when URL changes
+        const handleLocationChange = () => {
+            setId(window.location.pathname.split("/").pop());
+        };
+        // Listen for URL changes
+        window.addEventListener("popstate", handleLocationChange);
+
+        // Cleanup listener
+        return () => {
+            window.removeEventListener("popstate", handleLocationChange);
+        };
+    }, []);
 
     return (
         <header className="w-full flex sticky z-50 top-0 bg-background h-16 shrink-0 items-center justify-between px-4">

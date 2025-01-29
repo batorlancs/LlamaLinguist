@@ -14,6 +14,14 @@ type Chat = {
     content: string;
 };
 
+export const CustomKbd = ({ children }: { children: React.ReactNode }) => {
+    return (
+        <span className="bg-muted rounded-md px-1.5 py-0.5 text-muted-foreground">
+            {children}
+        </span>
+    );
+};
+
 export const Chat = () => {
     const [conversation, setConversation] =
         useState<ConversationDetails | null>(null);
@@ -201,8 +209,8 @@ export const Chat = () => {
                 <div className="text-xs text-muted-foreground mt-3 opacity-80 flex items-center gap-1.5">
                     <Info className="w-3.5 h-3.5" />
                     <p>
-                        Hit <kbd>Enter</kbd> to send, <kbd>Shift</kbd> +{" "}
-                        <kbd>Enter</kbd> for a new line
+                        Hit <CustomKbd>Enter</CustomKbd> to send,{" "}
+                        <CustomKbd>Shift + Enter</CustomKbd> for a new line
                     </p>
                 </div>
             </div>

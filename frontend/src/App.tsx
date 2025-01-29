@@ -10,7 +10,7 @@ const SidebarLayout = () => {
     return (
         <SidebarProvider>
             <AppSidebar />
-            <SidebarInset className="flex flex-col items-center">
+            <SidebarInset className="flex flex-col items-center overflow-y-auto overflow-x-hidden">
                 <Header />
                 <Routes>
                     <Route path="/chat/:chatId" element={<Chat />} />

@@ -1,6 +1,11 @@
 import { Config } from "@/config/config";
 
+export type User = {
+    username: string;
+};
+
 export class AuthService {
+    static user: User | null = null;
     private static isRefreshing = false;
     private static refreshSubscribers: ((token: string) => void)[] = [];
 

@@ -1,7 +1,7 @@
-import os
 import requests
 from pydantic import BaseModel
 from app_logging.app_logging import Logger
+from config.secrets import Secrets
 
 
 class OllamaMessage(BaseModel):
@@ -10,7 +10,7 @@ class OllamaMessage(BaseModel):
 
 
 class Ollama:
-    url = os.getenv("OLLAMA_URL")
+    url = Secrets.get("OLLAMA_URL")
     
     @staticmethod
     def generate(model: str, prompt: str) -> str:

@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlmodel import Field, Relationship, SQLModel, func
+from sqlmodel import Field, Relationship, SQLModel, func # type: ignore
 
 
 class User(SQLModel, table=True):

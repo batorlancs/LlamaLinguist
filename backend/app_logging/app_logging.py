@@ -1,93 +1,121 @@
 import logging
-import os
-from datetime import datetime
-from typing import Any
+import sys
+from typing import Any, Optional, List
 
-class AppLogger:
-    
-    # Add these color codes at the start of the class
+
+class Logger:
+    _instance: Optional["Logger"] = None
+    _logger: Optional[logging.Logger] = None
+    handlers: List[logging.Handler] = []
+
     COLORS = {
-        'DEBUG': '\033[90m',      # Gray
-        'INFO': '\033[34m',       # Blue
-        'WARNING': '\033[33m',    # Yellow
-        'ERROR': '\033[1;31m',      # Red
-        'CRITICAL': '\033[1;31m\033[4m', # Bold Red + Underline (to distinguish from ERROR)
-        'RESET': '\033[0m'        # Reset color
+        "DEBUG": "\033[36m",  # Cyan
+        "INFO": "\033[32m",  # Green
+        "WARNING": "\033[33m",  # Yellow
+        "ERROR": "\033[31m",  # Red
+        "CRITICAL": "\033[31;1m",  # Bright Red
+        "RESET": "\033[0m",  # Reset
+        "GRAY": "\033[90m",  # Gray
     }
-    
-    def __init__(self):
-        # Create logs directory if it doesn't exist
-        os.makedirs('logs', exist_ok=True)
 
-        # Configure root logger
-        self.logger = logging.getLogger('app')
-        self.logger.setLevel(logging.DEBUG)
+    @classmethod
+    def _setup_logging(cls):
+        # Clear the log file
+        open("app.log", "w").close()
 
-        # File handler with detailed format including date
-        file_handler = logging.FileHandler(f'logs/app_{datetime.now().strftime("%Y%m%d")}.log')
-        file_handler.setLevel(logging.DEBUG)
-        file_format = logging.Formatter('%(asctime)s - %(levelname)-8s - %(message)s')
-        file_handler.setFormatter(file_format)
+        # Create formatter for file logging (with timestamp)
+        file_formatter = logging.Formatter("%(asctime)s - %(levelname)-9s %(message)s")
 
-        # Modified stream handler with colored format
-        stream_handler = logging.StreamHandler()
+        class ColorFormatter(logging.Formatter):
+            def format(self, record: logging.LogRecord) -> str:
+                original_levelname = record.levelname
+                color = Logger.COLORS.get(record.levelname, Logger.COLORS["RESET"])
+                record.levelname = f"{color}{original_levelname}{Logger.COLORS['RESET']}:{' ' * (8 - len(original_levelname))}"
+                # Add gray coloring to text within square brackets
+                message = record.msg
+                if "[" in message and "]" in message:
+                    message = message.replace("[", f"{Logger.COLORS['GRAY']}[").replace(
+                        "]", f"]{Logger.COLORS['RESET']}"
+                    )
+                record.msg = message
+                return super().format(record)
+
+        # Create formatter for stream logging (without timestamp)
+        stream_formatter = ColorFormatter(
+            "%(levelname)s %(message)s"
+        )  # Removed -8s since padding is handled in formatter
+
+        # Create file handler (INFO and above)
+        file_handler = logging.FileHandler("app.log")
+        file_handler.setLevel(logging.INFO)
+        file_handler.setFormatter(file_formatter)
+
+        # Create stream handler (all levels)
+        stream_handler = logging.StreamHandler(sys.stdout)
         stream_handler.setLevel(logging.DEBUG)
-        stream_format = logging.Formatter(
-            '%(color)s%(levelname)-9s %(message)s%(reset)s',
-            defaults={'color': '', 'reset': ''}
-        )
-        stream_handler.setFormatter(stream_format)
+        stream_handler.setFormatter(stream_formatter)
 
-        # Custom filter to add color
-        class ColorFilter(logging.Filter):
-            def filter(self, record):
-                record.color = AppLogger.COLORS.get(record.levelname, '')
-                record.reset = AppLogger.COLORS['RESET']
-                return True
+        # Setup main logger
+        cls._logger = logging.getLogger("app")
+        cls._logger.setLevel(logging.DEBUG)
+        cls._logger.propagate = False
 
-        stream_handler.addFilter(ColorFilter())
+        # Clear existing handlers and add new ones
+        cls.handlers = [file_handler, stream_handler]
+        for handler in cls._logger.handlers[:]:
+            cls._logger.removeHandler(handler)
+        for handler in cls.handlers:
+            cls._logger.addHandler(handler)
 
-        # Add handlers to logger
-        self.logger.addHandler(file_handler)
-        self.logger.addHandler(stream_handler)
+    @staticmethod
+    def _get_caller_name(caller: Any) -> str:
+        if isinstance(caller, str):
+            return caller
+        if isinstance(caller, type):
+            return caller.__name__
+        if hasattr(caller, "__class__"):
+            return caller.__class__.__name__
+        elif hasattr(caller, "__name__"):
+            return caller.__name__
+        return str(caller)
 
-    def _get_name(self, source: Any) -> str:
-        """Extract name from the source object/class/string"""
-        if isinstance(source, type):
-            return source.__name__
-        elif hasattr(source, '__class__'):
-            return source.__class__.__name__
-        elif hasattr(source, '__name__'):
-            return source.__name__
-        return str(source)
-    
-    def _format_message(self, source: Any, message: str) -> str:
-        name = self._get_name(source)
-        return f"[{name}]: {message}"
+    @staticmethod
+    def _format_message(caller: Any, message: str) -> str:
+        caller_name = Logger._get_caller_name(caller)
+        return f"[{caller_name}] {message}"
 
-    def debug(self, source: Any, message: str):
-        """Log a debug message"""
-        formatted_message = self._format_message(source, message)
-        self.logger.debug(formatted_message)
+    @classmethod
+    def _ensure_logger(cls):
+        if cls._logger is None:
+            cls._setup_logging()
 
-    def info(self, source: Any, message: str):
-        """Log an info message"""
-        formatted_message = self._format_message(source, message)
-        self.logger.info(formatted_message)
+    @classmethod
+    def get_logger(cls):
+        if cls._logger is None:
+            raise ValueError("Logger not initialized")
+        return cls._logger
 
-    def warning(self, source: Any, message: str):
-        """Log a warning message"""
-        formatted_message = self._format_message(source, message)
-        self.logger.warning(formatted_message)
+    @classmethod
+    def debug(cls, caller: Any, message: str):
+        cls._ensure_logger()
+        cls.get_logger().debug(Logger._format_message(caller, message))
 
-    def error(self, source: Any, message: str):
-        """Log an error message"""
-        formatted_message = self._format_message(source, message)
-        self.logger.error(formatted_message)
+    @classmethod
+    def info(cls, caller: Any, message: str):
+        cls._ensure_logger()
+        cls.get_logger().info(Logger._format_message(caller, message))
 
-    def critical(self, source: Any, message: str):
-        """Log a critical message"""
-        formatted_message = self._format_message(source, message)
-        self.logger.critical(formatted_message)
+    @classmethod
+    def warning(cls, caller: Any, message: str):
+        cls._ensure_logger()
+        cls.get_logger().warning(Logger._format_message(caller, message))
 
-Logger = AppLogger()
+    @classmethod
+    def error(cls, caller: Any, message: str):
+        cls._ensure_logger()
+        cls.get_logger().error(Logger._format_message(caller, message))
+
+    @classmethod
+    def critical(cls, caller: Any, message: str):
+        cls._ensure_logger()
+        cls.get_logger().critical(Logger._format_message(caller, message))

@@ -1,26 +1,27 @@
-# Load environment variables before anything else
-from typing import Annotated
-from dotenv import load_dotenv
-load_dotenv()
-
-from config.Environment import Environment
-from utils.ollama import Ollama, OllamaMessage
+from typing import Any
 from app_logging.app_logging import Logger
-from auth import get_current_active_user, setup_auth, get_password_hash
-import os
-from pydantic import BaseModel
-from fastapi import Depends, FastAPI, HTTPException
+from config.secrets import Secrets
+from config.environment import Environment
+from startup import create_tables_for_dev
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlmodel import SQLModel
-from database.database import Database
-from database.schema.schema import Assistant, Message as ChatMessage, Conversation, User
+from routes.base import router as base_router
+from routes.auth import router as auth_router
+from routes.assistant import router as assistant_router
+from routes.conversation import router as conversation_router
 
-app = FastAPI()
-setup_auth(app)
 
-# Check if running in dev mode or with localhost/IP host
-ollama_url = os.getenv("OLLAMA_URL")
-frontend_url = os.getenv("FRONTEND_URL")
+def lifespan(app: FastAPI) -> Any:
+    Logger.info("main", "Starting up...")
+    create_tables_for_dev(app)
+    yield
+    Logger.info("main", "Shutting down...")
+
+
+app = FastAPI(lifespan=lifespan)
+
+
+frontend_url = Secrets.get("FRONTEND_URL")
 
 # Add CORS middleware configuration
 app.add_middleware(
@@ -31,327 +32,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-########################################################
-# Base Routes
-########################################################
 
 @app.get("/")
 async def read_root():
     return {"message": "Hello World"}
+
 
 @app.get("/ping")
 async def ping():
     return {"message": "pong"}
 
 
-########################################################
-# User Routes
-########################################################
+app.include_router(base_router, tags=["Base"])
+app.include_router(auth_router, tags=["Auth"])
+app.include_router(assistant_router, tags=["Assistant"])
+app.include_router(conversation_router, tags=["Conversation"])
 
-class GenerateRequest(BaseModel):
-    model: str
-    message: str
-
-@app.post("/generate")
-async def generate(
-    request: GenerateRequest,
-    current_user: Annotated[User, Depends(get_current_active_user)],
-):
-    Logger.debug(app, f"Generate request from user {current_user.name}: {request}")
-    response = Ollama.generate(request.model, request.message)
-    return {"response": response, "status": "success"}
-
-class ChatRequest(BaseModel):
-    model: str
-    message: str
-    conversation_id: int
-
-@app.post("/chat")
-async def chat(
-    request: ChatRequest,
-    current_user: Annotated[User, Depends(get_current_active_user)],
-):
-    Logger.debug(app, f"Chat request from user {current_user.name}: {request}")
-    with Database() as db:
-        conversation = db.get_conversation_by_id(request.conversation_id)
-        if not conversation:
-            raise HTTPException(status_code=404, detail="Conversation not found")
-        
-        if conversation.user_id != current_user.id:
-            raise HTTPException(status_code=403, detail="User does not have access to this conversation")
-        
-        conversation.messages.append(ChatMessage(role="user", content=request.message))
-        
-        # Convert conversation messages to Ollama format
-        messages = [
-            OllamaMessage(
-                role="assistant" if msg.role == "assistant" else "user",
-                content=msg.content
-            )
-            for msg in conversation.messages
-        ]
-        
-        messages.append(OllamaMessage(role="user", content=request.message))
-        response = Ollama.chat(request.model, messages)
-        
-        # Add response to conversation
-        conversation.messages.append(ChatMessage(role="assistant", content=response))
-        db.session.commit()
-         
-        return {"response": response, "status": "success"}
-
-
-########################################################
-# Conversation Routes
-########################################################
-
-@app.get("/conversations")
-async def conversations(
-    current_user: Annotated[User, Depends(get_current_active_user)],
-):
-    with Database() as db:
-        conversations = db.get_conversations(current_user)
-        return conversations
-    
-@app.get("/conversation/{conversation_id}")
-async def get_conversation(
-    conversation_id: int,
-    current_user: Annotated[User, Depends(get_current_active_user)],
-):
-    with Database() as db:
-        conversation = db.get_conversation_by_id(conversation_id)
-        return {
-            **conversation.model_dump(exclude={"user_id", "assistant_id"}),
-            "messages": [message.model_dump(exclude={"conversation_id"}) for message in conversation.messages],
-            "assistant": conversation.assistant.model_dump()
-        }
-
-
-class CreateConversationRequest(BaseModel):
-    title: str
-    assistant_id: int
-
-@app.post("/conversation")
-async def create_conversation(
-    request: CreateConversationRequest,
-    current_user: Annotated[User, Depends(get_current_active_user)],
-):
-    Logger.debug(app, f"Create conversation request from user {current_user.name}: {request}")
-    with Database() as db:
-        conversation = Conversation(
-            title=request.title,
-            user_id=current_user.id,
-            assistant_id=request.assistant_id
-        )
-        conversation = db.create_conversation(conversation)
-        return conversation
-    
-@app.delete("/conversation/{conversation_id}")
-async def delete_conversation(
-    conversation_id: int,
-    current_user: Annotated[User, Depends(get_current_active_user)],
-):
-    with Database() as db:
-        db.delete_conversation_by_id(conversation_id)
-        return {"status": "success"}
-
-
-########################################################
-# Assistant Routes
-########################################################
-
-@app.get("/assistants")
-async def get_assistants(
-    current_user: Annotated[User, Depends(get_current_active_user)],
-):
-    """Get all assistants for the current user"""
-    with Database() as db:
-        assistants = db.get_assistants(current_user)
-        return assistants
-
-
-class CreateAssistantRequest(BaseModel):
-    name: str
-    model: str
-
-@app.post("/assistant")
-async def create_assistant(
-    request: CreateAssistantRequest,
-    current_user: Annotated[User, Depends(get_current_active_user)],
-):
-    """Create a new assistant"""
-    Logger.debug(app, f"Create assistant request from user {current_user.name}: {request}")
-    with Database() as db:
-        assistant = Assistant(
-            name=request.name,
-            model=request.model,
-            user_id=current_user.id
-        )
-        assistant = db.create_assistant(assistant)
-        return assistant
-
-
-@app.delete("/assistant/{assistant_id}")
-async def delete_assistant(
-    assistant_id: int,
-    current_user: Annotated[User, Depends(get_current_active_user)],
-):
-    """Delete an assistant"""
-    Logger.debug(app, f"Delete assistant request from user {current_user.name}: {assistant_id}")
-    with Database() as db:
-        assistant = db.get_assistant_by_id(assistant_id)
-        if not assistant:
-            raise HTTPException(status_code=404, detail="Assistant not found")
-        
-        if assistant.user_id != current_user.id:
-            raise HTTPException(status_code=403, detail="User does not have access to this assistant")
-        
-        db.delete_assistant(assistant)
-        return {"status": "success"}
-
-
-class UpdateAssistantRequest(BaseModel):
-    name: str
-    model: str
-
-@app.put("/assistant/{assistant_id}")
-async def update_assistant(
-    assistant_id: int,
-    request: UpdateAssistantRequest,
-    current_user: Annotated[User, Depends(get_current_active_user)],
-):
-    """Update an assistant"""
-    Logger.debug(app, f"Update assistant request from user {current_user.name}: {request}")
-    with Database() as db:
-        assistant = db.get_assistant_by_id(assistant_id)
-        if not assistant:
-            raise HTTPException(status_code=404, detail="Assistant not found")
-        
-        if assistant.user_id != current_user.id:
-            raise HTTPException(status_code=403, detail="User does not have access to this assistant")
-        
-        assistant.name = request.name
-        assistant.model = request.model
-        db.session.commit()
-        db.session.refresh(assistant)
-        return assistant.model_dump()
-
-
-# @app.get("/user")
-# async def user():
-#     with Database() as db:
-#         user = db.get_user(email="user@example.com")
-#         if not user:
-#             return {"user": None}
-            
-#         response = {
-#             **user.model_dump(),
-#             "conversations": [
-#                 {
-#                     **conversation.model_dump(exclude={"user_id", "assistant_id"}),
-#                     "messages": [message.model_dump(exclude={"conversation_id"}) for message in conversation.messages],
-#                     "assistant": conversation.assistant.model_dump()
-#                 }
-#                 for conversation in user.conversations
-#             ]
-#         }
-#         return response
-
-########################################################
-# Events
-########################################################
-
-def create_tables_for_dev():
-    if not Environment.is_development():
-        return
-    
-    Logger.warning(app, "Running in dev mode!")
-    with Database() as db:
-        # Drop all tables first to ensure clean state
-        SQLModel.metadata.drop_all(db.engine)
-        # Create all tables fresh
-        SQLModel.metadata.create_all(db.engine)
-        
-        # create user
-        user = User(
-            name="user",
-            email="user@example.com",
-            hashed_password=get_password_hash("password"),
-        )
-        db.create_user(user)
-        db.session.refresh(user)
-        
-        # create assistant
-        assistant = Assistant(
-            name="Gerald",
-            model="llama3.2:1b",
-            user_id=user.id
-        )
-        db.create_assistant(assistant)
-        db.session.refresh(assistant)
-        
-        # create conversation
-        conversation = Conversation(
-            user_id=user.id,
-            assistant_id=assistant.id,
-            title="First Conversation"
-        )
-        db.create_conversation(conversation)
-        db.session.refresh(conversation)  # Add this line to get the conversation ID
-        
-        # Create messages after conversation is created
-        messages = [
-            ChatMessage(
-                role="user",
-                content="If x = 2, what is x^2?",
-                conversation_id=conversation.id  # Add conversation_id
-            ),
-            ChatMessage(
-                role="assistant",
-                content="It is 4",
-                conversation_id=conversation.id  # Add conversation_id
-            ),
-        ]
-        for message in messages:
-            db.session.add(message)
-        
-        conversation2 = Conversation(
-            user_id=user.id,
-            assistant_id=assistant.id,
-            title="Second Conversation"
-        )
-        db.create_conversation(conversation2)
-        db.session.refresh(conversation2)  # Add this line to get the conversation ID
-        
-        # Create messages after conversation is created
-        messages2 = [
-            ChatMessage(
-                role="user",
-                content="What is the weather in Tokyo?",
-                conversation_id=conversation2.id  # Add conversation_id
-            ),
-            ChatMessage(
-                role="assistant",
-                content="The weather in Tokyo is currently sunny with a temperature of 75 degrees Fahrenheit.",
-                conversation_id=conversation2.id  # Add conversation_id
-            ),
-            ChatMessage(
-                role="user",
-                content="Oh, that's great! Thank you!",
-                conversation_id=conversation2.id  # Add conversation_id
-            ),
-            ChatMessage(
-                role="assistant",
-                content="You're welcome! If you have any other questions, feel free to ask.",
-                conversation_id=conversation2.id  # Add conversation_id
-            )
-        ]
-        for message in messages2:
-            db.session.add(message)
-            
-        db.session.commit()
-
-
-@app.on_event("startup")
-async def startup_event():
-    create_tables_for_dev()

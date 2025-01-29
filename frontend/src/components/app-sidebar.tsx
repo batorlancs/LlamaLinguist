@@ -105,7 +105,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     };
 
     return (
-        <Sidebar {...props}>
+        <Sidebar {...props} className="z-20">
             <SidebarHeader>
                 <TeamSwitcher teams={data.teams} />
             </SidebarHeader>

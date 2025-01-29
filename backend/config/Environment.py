@@ -1,5 +1,6 @@
+from config.secrets import Secrets
 from dataclasses import dataclass
-import os
+
 
 
 @dataclass
@@ -9,8 +10,8 @@ class Environment:
 
     @staticmethod
     def is_development():
-        return os.getenv("ENVIRONMENT") == Environment.DEVELOPMENT
+        return Secrets.get("ENVIRONMENT") == Environment.DEVELOPMENT
 
     @staticmethod
     def is_production():
-        return os.getenv("ENVIRONMENT") == Environment.PRODUCTION
+        return Secrets.get("ENVIRONMENT") == Environment.PRODUCTION

@@ -1,118 +1,31 @@
-import os
 from dataclasses import dataclass
-from typing import List
-from sqlalchemy import create_engine, Subquery
-from sqlmodel import Session, select
-from database.schema.schema import Assistant, Conversation, Message as ChatMessage, User
+from typing import Any
+from sqlalchemy import create_engine
+from sqlmodel import Session
+from config.secrets import Secrets
+from database.utils.base import DatabaseSessionManagerUtils
+
 
 @dataclass
 class Config:
-    url: str = os.getenv("DATABASE_URL")
+    url: str = Secrets.get("DATABASE_URL")
 
-class Database:
+
+class DatabaseSessionManager:
     """Database access layer providing CRUD operations for users, conversations, messages and assistants."""
-    
+
     def __init__(self):
         """Initialize database connection engine."""
         self.engine = create_engine(Config.url)
-        self.session = None
+        self.session: Session = None # type: ignore
+        self.utils = DatabaseSessionManagerUtils(self)
 
-    def __enter__(self) -> 'Database':
+    def __enter__(self) -> "DatabaseSessionManager":
         """Context manager entry point that creates a new database session."""
         self.session = Session(self.engine)
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any):
         """Context manager exit point that ensures proper session cleanup."""
         if self.session:
             self.session.close()
-
-    ###########################################################################
-    # User operations
-    ###########################################################################
-    def get_user_by_email(self, email: str) -> User | None:
-        """Retrieve a user by their email address."""
-        statement = select(User).where(User.email == email)
-        return self.session.exec(statement).first()
-
-    def get_user(self, name: str) -> User | None:
-        """Retrieve a user by their username."""
-        statement = select(User).where(User.name == name)
-        return self.session.exec(statement).first()
-
-    def create_user(self, user: User) -> User:
-        """Create a new user record."""
-        self.session.add(user)
-        self.session.commit()
-        return user
-
-    ###########################################################################
-    # Conversation operations
-    ###########################################################################
-    def create_conversation(self, conversation: Conversation) -> Conversation:
-        """Create a new conversation record."""
-        self.session.add(conversation)
-        self.session.commit()
-        self.session.refresh(conversation)
-        return conversation
-
-    def get_conversation_by_id(self, conversation_id: int) -> Conversation | None:
-        """Retrieve a specific conversation by its ID."""
-        statement = select(Conversation).where(Conversation.id == conversation_id)
-        return self.session.exec(statement).first()
-
-    def get_conversations(self, user: User) -> List[Conversation]:
-        """Retrieve all conversations for a given user."""
-        statement = select(Conversation).where(Conversation.user_id == user.id)
-        return self.session.exec(statement).all()
-        
-    def delete_conversation_by_id(self, conversation_id: int) -> None:
-        """Delete a conversation record and all its messages by the conversation ID."""
-        statement = select(Conversation).where(Conversation.id == conversation_id)
-        conversation = self.session.exec(statement).first()
-        if conversation:
-            for message in conversation.messages:
-                self.session.delete(message)
-            self.session.delete(conversation)
-            self.session.commit()
-
-    ###########################################################################
-    # Assistant operations
-    ###########################################################################
-    
-    def get_assistants(self, user: User) -> List[Assistant]:
-        """Retrieve all assistants for a given user."""
-        statement = select(Assistant).where(Assistant.user_id == user.id)
-        return self.session.exec(statement).all()
-    
-    def create_assistant(self, assistant: Assistant) -> Assistant:
-        """Create a new assistant record."""
-        self.session.add(assistant)
-        self.session.commit()
-        self.session.refresh(assistant)
-        return assistant
-    
-    def get_assistant_by_id(self, assistant_id: int) -> Assistant | None:
-        """Retrieve a specific assistant by its ID."""
-        statement = select(Assistant).where(Assistant.id == assistant_id)
-        return self.session.exec(statement).first()
-
-    def delete_assistant(self, assistant: Assistant) -> None:
-        """Delete an assistant record."""
-        self.session.delete(assistant)
-        self.session.commit()
-
-    ###########################################################################
-    # Message operations
-    ###########################################################################
-    def create_messages(self, messages: List[ChatMessage]) -> List[ChatMessage]:
-        """Create multiple message records in bulk."""
-        self.session.add_all(messages)
-        self.session.commit()
-        self.session.refresh(messages)
-        return messages
-
-    def get_messages(self, conversation: Conversation) -> List[ChatMessage]:
-        """Retrieve all messages for a given conversation."""
-        statement = select(ChatMessage).where(ChatMessage.conversation_id == conversation.id)
-        return self.session.exec(statement).all()

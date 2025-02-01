@@ -11,12 +11,17 @@ const SidebarLayout = () => {
         <SidebarProvider>
             <AppSidebar />
             <SidebarInset>
-                <Header />
-                <Routes>
-                    <Route path="/chat/:chatId" element={<Chat />} />
-                    <Route path="/chat" element={<Chat />} />
-                    <Route index element={<Navigate to="/chat" replace />} />
-                </Routes>
+                <div className="w-full h-full flex flex-col items-center justify-between">
+                    <Header />
+                    <Routes>
+                        <Route path="/chat/:chatId" element={<Chat />} />
+                        <Route path="/chat" element={<Chat />} />
+                        <Route
+                            index
+                            element={<Navigate to="/chat" replace />}
+                        />
+                    </Routes>
+                </div>
             </SidebarInset>
         </SidebarProvider>
     );

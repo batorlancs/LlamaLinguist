@@ -28,28 +28,31 @@ export const Header = () => {
     }, []);
 
     return (
-        <header className="w-full flex sticky z-10 top-0 h-16 shrink-0 items-center justify-between px-4">
-            <div className="absolute top-0 h-16 w-full bg-background" />
-            <div className="absolute inset-x-0 -bottom-6 h-6 z-5 pointer-events-none bg-gradient-to-b from-background to-transparent" />
-            <div className="flex items-center gap-2 z-20">
-                <SidebarTrigger className="-ml-1" />
-                <Separator orientation="vertical" className="mr-2 h-4" />
-                <Breadcrumb>
-                    <BreadcrumbList>
-                        <BreadcrumbItem className="hidden md:block">
-                            <BreadcrumbLink href="#">
-                                Conversation
-                            </BreadcrumbLink>
-                        </BreadcrumbItem>
-                        <BreadcrumbSeparator className="hidden md:block" />
-                        <BreadcrumbItem>
-                            <BreadcrumbPage>{id}</BreadcrumbPage>
-                        </BreadcrumbItem>
-                    </BreadcrumbList>
-                </Breadcrumb>
-            </div>
-            <div className="flex items-center gap-2 z-20">
-                <ModeToggle />
+        <header className="w-full sticky z-10 top-0 h-24 shrink-0 px-4 overflow-hidden">
+            <div className="absolute inset-x-0 bottom-2 h-6 z-5 pointer-events-none bg-gradient-to-b from-background to-transparent" />
+            <div className="absolute top-0 h-16 w-full bg-background " />
+            {/* <div className="absolute inset-x-0 -bottom-6 h-6 z-5 pointer-events-none bg-gradient-to-b from-background to-transparent" /> */}
+            <div className="flex items-center justify-between w-full h-16">
+                <div className="flex items-center gap-2 z-20">
+                    <SidebarTrigger className="-ml-1" />
+                    <Separator orientation="vertical" className="mr-2 h-4" />
+                    <Breadcrumb>
+                        <BreadcrumbList>
+                            <BreadcrumbItem className="hidden md:block">
+                                <BreadcrumbLink href="#">
+                                    Conversation
+                                </BreadcrumbLink>
+                            </BreadcrumbItem>
+                            <BreadcrumbSeparator className="hidden md:block" />
+                            <BreadcrumbItem>
+                                <BreadcrumbPage>{id}</BreadcrumbPage>
+                            </BreadcrumbItem>
+                        </BreadcrumbList>
+                    </Breadcrumb>
+                </div>
+                <div className="flex items-center gap-2 z-20">
+                    <ModeToggle />
+                </div>
             </div>
         </header>
     );

@@ -8,7 +8,10 @@ from database.schema.schema import User
 
 ACCESS_TOKEN_EXPIRE_MINUTES = int(Secrets.get("ACCESS_TOKEN_EXPIRE_MINUTES"))
 
-router = APIRouter()
+router = APIRouter(
+    prefix="/auth",
+    tags=["Auth"],
+)
 
 
 @router.post("/token")

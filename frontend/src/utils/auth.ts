@@ -37,7 +37,7 @@ export class AuthService {
                 throw new Error("No credentials stored");
             }
 
-            const response = await fetch(`${Config.BACKEND_URL}/token`, {
+            const response = await fetch(`${Config.BACKEND_URL}/auth/token`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/x-www-form-urlencoded",

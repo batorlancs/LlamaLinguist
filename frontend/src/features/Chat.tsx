@@ -1,5 +1,5 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ConversationDetails } from "@/types/api/responses";
+import { ConversationWithMessages } from "@/types/api/responses";
 import { api } from "@/utils/api";
 import { Info, Loader2, Send } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -24,7 +24,7 @@ export const CustomKbd = ({ children }: { children: React.ReactNode }) => {
 
 export const Chat = () => {
     const [conversation, setConversation] =
-        useState<ConversationDetails | null>(null);
+        useState<ConversationWithMessages | null>(null);
     const [chat, setChat] = useState<Chat[]>([]);
     const [input, setInput] = useState<string>("");
     const [isLoading, setIsLoading] = useState(false);
@@ -43,11 +43,11 @@ export const Chat = () => {
             if (!id) return;
 
             try {
-                const response = await api<ConversationDetails>(
+                const response = await api<ConversationWithMessages>(
                     `/conversation/${id}`
                 );
-                setConversation(response);
-                setChat(response.messages);
+                setConversation(response.data);
+                setChat(response.data.messages);
             } catch (error) {
                 console.error("Error fetching conversation:", error);
             }
@@ -63,7 +63,7 @@ export const Chat = () => {
 
     const fetchChatResponse = async (message: string): Promise<string> => {
         try {
-            const data = await api<{ response: string }>("/chat", {
+            const response = await api<string>("/chat", {
                 method: "POST",
                 body: {
                     message,
@@ -71,7 +71,7 @@ export const Chat = () => {
                     conversation_id: id,
                 },
             });
-            return data.response;
+            return response.data;
         } catch (error) {
             console.error("Error fetching:", error);
             return "Error fetching response :(";

@@ -22,7 +22,6 @@ export interface Assistant {
     created_at: string;
 }
 
-export interface ConversationDetails extends Conversation {
+export interface ConversationWithMessages extends Conversation {
     messages: Message[];
-    assistant: Assistant;
 }

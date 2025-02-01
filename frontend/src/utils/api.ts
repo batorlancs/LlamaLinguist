@@ -1,6 +1,6 @@
 import { AuthService } from "./auth";
 import { HttpError, NoAccessTokenError, UnauthorizedError } from "./errors";
-import { RequestOptions } from "./types";
+import { ApiResponse, RequestOptions } from "./types";
 
 const API_URL = import.meta.env.BACKEND_URL || "http://localhost:8000";
 
@@ -8,10 +8,10 @@ export const api = async <T>(
     endpoint: string,
     options: RequestOptions = {},
     retry: boolean = true
-): Promise<T> => {
+): Promise<ApiResponse<T>> => {
     const { method = "GET", body, headers = {} } = options;
 
-    async function executeRequest(): Promise<Response> {
+    async function executeRequest(): Promise<ApiResponse<T>> {
         const accessToken = localStorage.getItem("access_token");
         if (!accessToken) {
             throw new NoAccessTokenError();
@@ -41,7 +41,7 @@ export const api = async <T>(
     }
 
     try {
-        return (await executeRequest()) as T;
+        return (await executeRequest()) as ApiResponse<T>;
     } catch (error) {
         if (
             error instanceof NoAccessTokenError ||

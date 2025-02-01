@@ -1,4 +1,5 @@
 import { Config } from "@/config/config";
+import { ApiResponse } from "./types";
 
 export type User = {
     username: string;
@@ -49,8 +50,14 @@ export class AuthService {
                 throw new Error("Failed to refresh token");
             }
 
-            const { access_token } = await response.json();
-            localStorage.setItem("access_token", access_token);
+            const response_dict: ApiResponse<{ access_token: string }> =
+                await response.json();
+
+            const access_token = response_dict?.data?.access_token;
+
+            if (access_token) {
+                localStorage.setItem("access_token", access_token);
+            }
 
             // Notify all subscribers about the new token
             this.refreshSubscribers.forEach((callback) =>

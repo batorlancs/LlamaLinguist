@@ -60,8 +60,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         try {
             setIsLoading(true);
             // await new Promise((resolve) => setTimeout(resolve, 1000));
-            const conversations = await api<Conversation[]>("/conversations");
-            const newProjects = conversations.map((conversation) => ({
+            const response = await api<Conversation[]>("/conversations");
+            const newProjects = response.data.map((conversation) => ({
                 id: conversation.id,
                 name: conversation.title,
                 url: `/chat/${conversation.id}`,
@@ -82,7 +82,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     }, []);
 
     const createConversation = async () => {
-        const conversation = await api<Conversation>("/conversation", {
+        const response = await api<Conversation>("/conversation", {
             method: "POST",
             body: {
                 title: "New Conversation",
@@ -90,7 +90,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             },
         });
         await fetchConversations();
-        navigate(`/chat/${conversation.id}`);
+        navigate(`/chat/${response.data.id}`);
     };
 
     const deleteConversation = async (id: number) => {

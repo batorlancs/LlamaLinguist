@@ -1,4 +1,5 @@
 from typing import TYPE_CHECKING
+
 from sqlmodel import select
 from database.schema.schema import User
 
@@ -10,15 +11,19 @@ class DatabaseSessionManagerUserUtils:
     def __init__(self, dsm: "DatabaseSessionManager"):
         self.dsm = dsm
         
-    def get(self, name: str) -> User | None:
+    def get_by_id(self, user_id: int) -> User | None:
+        """Retrieve a user by their ID."""
+        return self.dsm.session.get(User, user_id)
+    
+    def get_by_name(self, name: str) -> User | None:
         """Retrieve a user by their username."""
-        statement = select(User).where(User.name == name)
-        return self.dsm.session.exec(statement).first()
+        stmt = select(User).where(User.name == name)
+        result = self.dsm.session.exec(stmt)
+        return result.first()
 
     def get_by_email(self, email: str) -> User | None:
         """Retrieve a user by their email address."""
-        statement = select(User).where(User.email == email)
-        return self.dsm.session.exec(statement).first()
+        return self.dsm.session.get(User, email)
 
     def create(self, user: User) -> User:
         """Create a new user record."""
@@ -31,3 +36,10 @@ class DatabaseSessionManagerUserUtils:
         """Delete a user record."""
         self.dsm.session.delete(user)
         self.dsm.session.commit()
+    
+    def update(self, user: User) -> User:
+        """Update a user record."""
+        self.dsm.session.add(user)
+        self.dsm.session.commit()
+        self.dsm.session.refresh(user)
+        return user

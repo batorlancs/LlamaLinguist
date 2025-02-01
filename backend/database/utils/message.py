@@ -10,7 +10,7 @@ class DatabaseSessionManagerMessageUtils:
     def __init__(self, dsm: "DatabaseSessionManager"):
         self.dsm = dsm
 
-    def get_all(self, conversation: Conversation) -> List[ChatMessage]:
+    def get_all_by_conversation(self, conversation: Conversation) -> List[ChatMessage]:
         """Retrieve all messages for a given conversation."""
         statement = select(ChatMessage).where(
             ChatMessage.conversation_id == conversation.id

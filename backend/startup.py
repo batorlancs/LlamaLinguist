@@ -12,32 +12,28 @@ def create_tables_for_dev(app: FastAPI):
         return
 
     Logger.warning(app, "Running in dev mode!")
+    Logger.debug(app, "Creating tables for dev mode...")
+    
     with DatabaseSessionManager() as dsm:
-        # Drop all tables first to ensure clean state
+        # clear data before
         SQLModel.metadata.drop_all(dsm.engine)
-        # Create all tables fresh
         SQLModel.metadata.create_all(dsm.engine)
 
         # create user
         user = User(
-            name="user",
-            email="user@example.com",
-            hashed_password=get_password_hash("password"),
+            name="guest_user",
+            hashed_password=get_password_hash("guest_password"),
         )
         dsm.utils.user.create(user)
-        dsm.session.refresh(user)
 
         # create assistant
         assistant = Assistant(name="Gerald", model="llama3.2:1b", user_id=user.id)
         dsm.utils.assistant.create(assistant)
-        dsm.session.refresh(assistant)
 
-        # create conversation
         conversation = Conversation(
             user_id=user.id, assistant_id=assistant.id, title="First Conversation"
         )
-        dsm.utils.conversation.create(conversation)
-        dsm.session.refresh(conversation)  # Add this line to get the conversation ID
+        conversation = dsm.utils.conversation.create(conversation)
 
         # Create messages after conversation is created
         messages = [
@@ -54,12 +50,14 @@ def create_tables_for_dev(app: FastAPI):
         ]
         for message in messages:
             dsm.session.add(message)
-
+        
+        dsm.session.commit()
+        
+        # Create second conversation
         conversation2 = Conversation(
             user_id=user.id, assistant_id=assistant.id, title="Second Conversation"
         )
-        dsm.utils.conversation.create(conversation2)
-        dsm.session.refresh(conversation2)  # Add this line to get the conversation ID
+        conversation2 = dsm.utils.conversation.create(conversation2)
 
         # Create messages after conversation is created
         messages2 = [
@@ -88,3 +86,4 @@ def create_tables_for_dev(app: FastAPI):
             dsm.session.add(message)
 
         dsm.session.commit()
+        Logger.debug(app, "Tables created successfully")

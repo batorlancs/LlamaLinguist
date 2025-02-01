@@ -1,23 +1,27 @@
 from typing import Annotated
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel
 from app_logging.app_logging import Logger
 from auth import get_current_active_user
-from database.database import DatabaseSessionManager
-from database.schema.schema import Assistant, User
+from core.exception import APIException
+from core.response import APIResponse
+from database.database import DatabaseSessionManager, get_dsm
+from database.schema.schema import Assistant, AssistantPublic, User
 
 
-router = APIRouter()
+router = APIRouter(
+    tags=["Assistant"]
+)
 
 
-@router.get("/assistants")
+@router.get("/assistants", response_model=APIResponse[list[AssistantPublic]])
 async def get_assistants(
     current_user: Annotated[User, Depends(get_current_active_user)],
-):
+    dsm: Annotated[DatabaseSessionManager, Depends(get_dsm)],
+):  
     """Get all assistants for the current user"""
-    with DatabaseSessionManager() as dsm:
-        assistants = dsm.utils.assistant.get_all(current_user)
-        return assistants
+    assistants = dsm.utils.assistant.get_all_by_user(current_user)
+    return APIResponse(data=assistants, message="Assistants fetched successfully")
 
 
 class CreateAssistantRequest(BaseModel):
@@ -25,45 +29,49 @@ class CreateAssistantRequest(BaseModel):
     model: str
 
 
-@router.post("/assistant")
+@router.post("/assistant", response_model=APIResponse[AssistantPublic])
 async def create_assistant(
     request: CreateAssistantRequest,
     current_user: Annotated[User, Depends(get_current_active_user)],
+    dsm: Annotated[DatabaseSessionManager, Depends(get_dsm)],
 ):
     """Create a new assistant"""
     Logger.debug(
         router, f"Create assistant request from user {current_user.name}: {request}"
     )
-    with DatabaseSessionManager() as dsm:
-        assistant = Assistant(
-            name=request.name, model=request.model, user_id=current_user.id
-        )
-        assistant = dsm.utils.assistant.create(assistant)
-        return assistant
+    assistant = Assistant(
+        name=request.name, model=request.model, user_id=current_user.id
+    )
+    assistant = dsm.utils.assistant.create(assistant)
+    return APIResponse(data=assistant, message="Assistant created successfully")
 
 
-@router.delete("/assistant/{assistant_id}")
+@router.delete("/assistant/{assistant_id}", response_model=APIResponse[None])
 async def delete_assistant(
     assistant_id: int,
     current_user: Annotated[User, Depends(get_current_active_user)],
+    dsm: Annotated[DatabaseSessionManager, Depends(get_dsm)],
 ):
     """Delete an assistant"""
     Logger.debug(
         router,
         f"Delete assistant request from user {current_user.name}: {assistant_id}",
     )
-    with DatabaseSessionManager() as dsm:
-        assistant = dsm.utils.assistant.get_by_id(assistant_id)
-        if not assistant:
-            raise HTTPException(status_code=404, detail="Assistant not found")
+    assistant = dsm.utils.assistant.get_by_id(assistant_id)
+    if not assistant:
+        raise APIException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Assistant not found",
+        )
 
-        if assistant.user_id != current_user.id:
-            raise HTTPException(
-                status_code=403, detail="User does not have access to this assistant"
-            )
+    if assistant.user_id != current_user.id:
+        raise APIException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User does not have access to this assistant",
+        )
 
-        dsm.utils.assistant.delete(assistant)
-        return {"status": "success"}
+    dsm.utils.assistant.delete(assistant)
+    return APIResponse(message="Assistant deleted successfully")
 
 
 class UpdateAssistantRequest(BaseModel):
@@ -71,28 +79,32 @@ class UpdateAssistantRequest(BaseModel):
     model: str
 
 
-@router.put("/assistant/{assistant_id}")
+@router.put("/assistant/{assistant_id}", response_model=APIResponse[AssistantPublic])
 async def update_assistant(
     assistant_id: int,
     request: UpdateAssistantRequest,
     current_user: Annotated[User, Depends(get_current_active_user)],
+    dsm: Annotated[DatabaseSessionManager, Depends(get_dsm)],
 ):
     """Update an assistant"""
     Logger.debug(
         router, f"Update assistant request from user {current_user.name}: {request}"
     )
-    with DatabaseSessionManager() as dsm:
-        assistant = dsm.utils.assistant.get_by_id(assistant_id)
-        if not assistant:
-            raise HTTPException(status_code=404, detail="Assistant not found")
+    assistant = dsm.utils.assistant.get_by_id(assistant_id)
+    if not assistant:
+        raise APIException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Assistant not found",
+        )
 
-        if assistant.user_id != current_user.id:
-            raise HTTPException(
-                status_code=403, detail="User does not have access to this assistant"
-            )
+    if assistant.user_id != current_user.id:
+        raise APIException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User does not have access to this assistant",
+        )
 
-        assistant.name = request.name
-        assistant.model = request.model
-        dsm.session.commit()
-        dsm.session.refresh(assistant)
-        return assistant.model_dump()
+    assistant.name = request.name
+    assistant.model = request.model
+    updated_assistant = dsm.utils.assistant.update(assistant)
+    return APIResponse(data=updated_assistant, message="Assistant updated successfully")
+

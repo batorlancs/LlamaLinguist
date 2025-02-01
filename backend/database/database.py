@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Generator
 from sqlalchemy import create_engine
 from sqlmodel import Session
 from config.secrets import Secrets
@@ -29,3 +29,9 @@ class DatabaseSessionManager:
         """Context manager exit point that ensures proper session cleanup."""
         if self.session:
             self.session.close()
+            
+
+
+def get_dsm() -> Generator["DatabaseSessionManager", None, None]:
+    with DatabaseSessionManager() as dsm:
+        yield dsm

@@ -1,5 +1,5 @@
 from sqlmodel import select
-from database.schema.schema import Conversation, User
+from database.schema.schema import Assistant, Conversation, User
 from typing import TYPE_CHECKING, List
 
 if TYPE_CHECKING:
@@ -12,12 +12,17 @@ class DatabaseSessionManagerConversationUtils:
 
     def get_by_id(self, conversation_id: int) -> Conversation | None:
         """Retrieve a specific conversation by its ID."""
-        statement = select(Conversation).where(Conversation.id == conversation_id)
-        return self.dsm.session.exec(statement).first()
+        stmt = select(Conversation).where(Conversation.id == conversation_id)
+        return self.dsm.session.exec(stmt).first()
 
-    def get_all(self, user: User) -> List[Conversation]:
+    def get_all_by_user(self, user: User) -> List[Conversation]:
         """Retrieve all conversations for a given user."""
         statement = select(Conversation).where(Conversation.user_id == user.id)
+        return list(self.dsm.session.exec(statement))
+    
+    def get_all_by_assistant(self, assistant: Assistant) -> List[Conversation]:
+        """Retrieve all conversations for a given assistant."""
+        statement = select(Conversation).where(Conversation.assistant_id == assistant.id)
         return list(self.dsm.session.exec(statement))
     
     def create(self, conversation: Conversation) -> Conversation:
@@ -27,12 +32,14 @@ class DatabaseSessionManagerConversationUtils:
         self.dsm.session.refresh(conversation)
         return conversation
 
-    def delete_by_id(self, conversation_id: int) -> None:
+    def delete(self, conversation: Conversation) -> None:
         """Delete a conversation record and all its messages by the conversation ID."""
-        statement = select(Conversation).where(Conversation.id == conversation_id)
-        conversation = self.dsm.session.exec(statement).first()
-        if conversation:
-            for message in conversation.messages:
-                self.dsm.session.delete(message)
-            self.dsm.session.delete(conversation)
-            self.dsm.session.commit()
+        self.dsm.session.delete(conversation)
+        self.dsm.session.commit()
+        
+    def update(self, conversation: Conversation) -> Conversation:
+        """Update a conversation record."""
+        self.dsm.session.add(conversation)
+        self.dsm.session.commit()
+        self.dsm.session.refresh(conversation)
+        return conversation

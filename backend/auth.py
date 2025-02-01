@@ -3,12 +3,13 @@ import bcrypt
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, Any
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, status
 from fastapi.security import OAuth2PasswordBearer
 from jwt.exceptions import InvalidTokenError
 from passlib.context import CryptContext
 from pydantic import BaseModel
 from config.secrets import Secrets
+from core.exception import APIException
 from database.database import DatabaseSessionManager
 from database.schema.schema import User
 
@@ -45,7 +46,7 @@ def get_password_hash(password: str) -> str:
 
 def get_user(name: str) -> User | None:
     with DatabaseSessionManager() as dsm:
-        return dsm.utils.user.get(name)
+        return dsm.utils.user.get_by_name(name)
 
 def authenticate_user(name: str, password: str):
     user = get_user(name)
@@ -68,7 +69,7 @@ def create_access_token(data: dict[str, Any], expires_delta: timedelta | None = 
 
 
 async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]):
-    credentials_exception = HTTPException(
+    credentials_exception = APIException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
@@ -92,38 +93,8 @@ async def get_current_active_user(
     current_user: Annotated[User, Depends(get_current_user)],
 ):
     if current_user.disabled:
-        raise HTTPException(status_code=400, detail="Inactive user")
+        raise APIException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Inactive user",
+        )
     return current_user
-
-
-# def setup_auth(app: FastAPI):
-#     @app.post("/token")
-#     async def login_for_access_token(
-#         form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
-#     ) -> Token:
-#         user = authenticate_user(form_data.username, form_data.password)
-#         if not user:
-#             raise HTTPException(
-#                 status_code=status.HTTP_401_UNAUTHORIZED,
-#                 detail="Incorrect username or password",
-#                 headers={"WWW-Authenticate": "Bearer"},
-#             )
-#         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-#         access_token = create_access_token(
-#             data={"sub": user.name}, expires_delta=access_token_expires
-#         )
-#         return Token(access_token=access_token, token_type="bearer")
-
-
-#     @app.get("/users/me/", response_model=User)
-#     async def read_users_me(
-#         current_user: Annotated[User, Depends(get_current_active_user)],
-#     ):
-#         return current_user.model_dump(exclude={"hashed_password"})
-
-
-#     @app.get("/users/me/items/")
-#     async def read_own_items(
-#         current_user: Annotated[User, Depends(get_current_active_user)],
-#     ):
-#         return [{"item_id": "Foo", "owner": current_user.name}]

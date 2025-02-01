@@ -1,8 +1,7 @@
-from dataclasses import dataclass
 import os
 from dotenv import load_dotenv
 
-@dataclass
+
 class Secrets:
     # Load environment variables on module import
     load_dotenv()

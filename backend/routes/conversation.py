@@ -1,46 +1,47 @@
 from typing import Annotated
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, status
 from pydantic import BaseModel
 from app_logging.app_logging import Logger
 from auth import get_current_active_user
 from core.exception import APIException
-from database.database import DatabaseSessionManager
-from database.schema.schema import Conversation, User
+from core.response import APIResponse
+from database.database import DatabaseSessionManager, get_dsm
+from database.schema.schema import Conversation, ConversationPublic, ConversationPublicWithMessages, User
 
 
-router = APIRouter()
+router = APIRouter(
+    tags=["Conversation"]
+)
 
 
-@router.get("/conversations")
+@router.get("/conversations", response_model=APIResponse[list[ConversationPublic]])
 async def conversations(
     current_user: Annotated[User, Depends(get_current_active_user)],
+    dsm: Annotated[DatabaseSessionManager, Depends(get_dsm)],
 ):
-    with DatabaseSessionManager() as dsm:
-        conversations = dsm.utils.conversation.get_all(current_user)
-        return conversations
+    return APIResponse(
+        data=dsm.utils.conversation.get_all_by_user(current_user),
+        message="Conversations fetched successfully",
+    )
 
 
-@router.get("/conversation/{conversation_id}")
+@router.get("/conversation/{conversation_id}", response_model=APIResponse[ConversationPublicWithMessages])
 async def get_conversation(
     conversation_id: int,
     current_user: Annotated[User, Depends(get_current_active_user)],
+    dsm: Annotated[DatabaseSessionManager, Depends(get_dsm)],
 ):
-    with DatabaseSessionManager() as dsm:
-        conversation = dsm.utils.conversation.get_by_id(conversation_id)
-        if not conversation:
-            raise APIException(
-                status_code=APIException.HTTP_404_NOT_FOUND,
-                detail="Conversation not found",
-            )
+    conversation = dsm.utils.conversation.get_by_id(conversation_id)
+    if not conversation:
+        raise APIException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Conversation not found",
+        )
 
-        return {
-            **conversation.model_dump(exclude={"user_id", "assistant_id"}),
-            "messages": [
-                message.model_dump(exclude={"conversation_id"})
-                for message in conversation.messages
-            ],
-            "assistant": conversation.assistant.model_dump(),
-        }
+    return APIResponse(
+        data=conversation,
+        message="Conversation fetched successfully",
+    )
 
 
 class CreateConversationRequest(BaseModel):
@@ -48,29 +49,37 @@ class CreateConversationRequest(BaseModel):
     assistant_id: int
 
 
-@router.post("/conversation")
+@router.post("/conversation", response_model=APIResponse[Conversation])
 async def create_conversation(
     request: CreateConversationRequest,
     current_user: Annotated[User, Depends(get_current_active_user)],
+    dsm: Annotated[DatabaseSessionManager, Depends(get_dsm)],
 ):
     Logger.debug(
         router, f"Create conversation request from user {current_user.name}: {request}"
     )
-    with DatabaseSessionManager() as dsm:
-        conversation = Conversation(
-            title=request.title,
-            user_id=current_user.id,
-            assistant_id=request.assistant_id,
-        )
-        conversation = dsm.utils.conversation.create(conversation)
-        return conversation
+    conversation = Conversation(
+        title=request.title,
+        user_id=current_user.id,
+        assistant_id=request.assistant_id,
+    )
+    return APIResponse(
+        data=dsm.utils.conversation.create(conversation),
+        message="Conversation created successfully",
+    )
 
 
-@router.delete("/conversation/{conversation_id}")
+@router.delete("/conversation/{conversation_id}", response_model=APIResponse[None])
 async def delete_conversation(
     conversation_id: int,
     current_user: Annotated[User, Depends(get_current_active_user)],
+    dsm: Annotated[DatabaseSessionManager, Depends(get_dsm)],
 ):
-    with DatabaseSessionManager() as dsm:
-        dsm.utils.conversation.delete_by_id(conversation_id)
-        return {"status": "success"}
+    conversation = dsm.utils.conversation.get_by_id(conversation_id)
+    if not conversation:
+        raise APIException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Conversation not found",
+        )
+    dsm.utils.conversation.delete(conversation)
+    return APIResponse(message="Conversation deleted successfully")

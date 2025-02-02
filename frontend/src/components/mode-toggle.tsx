@@ -4,13 +4,38 @@ import { Button } from "@/components/ui/button";
 import {
     DropdownMenu,
     DropdownMenuContent,
-    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuRadioGroup,
+    DropdownMenuRadioItem,
+    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useTheme } from "@/components/theme-provider";
+import { Theme, useTheme } from "@/components/theme-provider";
+
+type ThemeOption = {
+    name: string;
+    value: Theme;
+};
+
+type ThemeList = ThemeOption[];
 
 export function ModeToggle() {
-    const { setTheme } = useTheme();
+    const { theme, setTheme } = useTheme();
+
+    const themeList: ThemeList = [
+        {
+            name: "Light",
+            value: "light",
+        },
+        {
+            name: "Dark",
+            value: "dark",
+        },
+        {
+            name: "System",
+            value: "system",
+        },
+    ];
 
     return (
         <DropdownMenu>
@@ -22,15 +47,21 @@ export function ModeToggle() {
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setTheme("light")}>
-                    Light
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTheme("dark")}>
-                    Dark
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTheme("system")}>
-                    System
-                </DropdownMenuItem>
+                <DropdownMenuLabel>Choose Theme</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuRadioGroup
+                    value={theme}
+                    onValueChange={(value) => setTheme(value as Theme)}
+                >
+                    {themeList.map((themeListItem) => (
+                        <DropdownMenuRadioItem
+                            key={themeListItem.value}
+                            value={themeListItem.value}
+                        >
+                            {themeListItem.name}
+                        </DropdownMenuRadioItem>
+                    ))}
+                </DropdownMenuRadioGroup>
             </DropdownMenuContent>
         </DropdownMenu>
     );

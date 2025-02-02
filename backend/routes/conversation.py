@@ -37,6 +37,12 @@ async def get_conversation(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Conversation not found",
         )
+        
+    if conversation.user_id != current_user.id:
+        raise APIException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not allowed to access this conversation",
+        )
 
     return APIResponse(
         data=conversation,
@@ -81,5 +87,12 @@ async def delete_conversation(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Conversation not found",
         )
+    
+    if conversation.user_id != current_user.id:
+        raise APIException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not allowed to delete this conversation",
+        )
+    
     dsm.utils.conversation.delete(conversation)
     return APIResponse(message="Conversation deleted successfully")

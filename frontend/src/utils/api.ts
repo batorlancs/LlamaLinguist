@@ -56,3 +56,34 @@ export const api = async <T>(
         throw error;
     }
 };
+
+/**
+ * Public API endpoint.
+ * @param endpoint - The endpoint to call.
+ * @param options - The request options.
+ * @returns The API response.
+ */
+export const apiPublic = async <T>(
+    endpoint: string,
+    options: RequestOptions = {}
+): Promise<ApiResponse<T>> => {
+    const { method = "GET", body, headers = {} } = options;
+
+    const requestOptions: RequestInit = {
+        method,
+        headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            ...headers,
+        },
+        mode: "cors",
+    };
+
+    if (body) {
+        requestOptions.body = JSON.stringify(body);
+    }
+
+    const response = await fetch(`${API_URL}${endpoint}`, requestOptions);
+    if (!response.ok) throw new HttpError(response.status);
+    return response.json();
+};

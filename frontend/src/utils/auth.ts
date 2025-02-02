@@ -1,5 +1,7 @@
 import { Config } from "@/config/config";
 import { ApiResponse } from "./types";
+import { HttpError, UnauthorizedError } from "./errors";
+import { apiPublic } from "./api";
 
 export type User = {
     username: string;
@@ -30,9 +32,6 @@ export class AuthService {
             const username = localStorage.getItem("username");
             const password = localStorage.getItem("password");
 
-            console.log("username", username);
-            console.log("password", password);
-
             if (!username || !password) {
                 this.goToLogin();
                 throw new Error("No credentials stored");
@@ -47,7 +46,11 @@ export class AuthService {
             });
 
             if (!response.ok) {
-                throw new Error("Failed to refresh token");
+                if (response.status === 401) {
+                    throw new UnauthorizedError();
+                } else {
+                    throw new HttpError(response.status);
+                }
             }
 
             const response_dict: ApiResponse<{ access_token: string }> =
@@ -64,21 +67,26 @@ export class AuthService {
                 callback(access_token)
             );
             this.refreshSubscribers = [];
-
             return access_token;
         } catch (error) {
-            console.error("Error refreshing token", error);
-            this.goToLogin();
+            console.log("Error refreshing token", error);
             throw error;
         } finally {
             this.isRefreshing = false;
         }
     }
 
-    static login(username: string, password: string): void {
+    static async login(username: string, password: string): Promise<void> {
         localStorage.setItem("username", username);
         localStorage.setItem("password", password);
-        this.refreshToken();
+        await this.refreshToken();
+    }
+
+    static async register(username: string, password: string): Promise<void> {
+        await apiPublic("/auth/register", {
+            method: "POST",
+            body: { username, password },
+        });
     }
 
     static logout(): void {

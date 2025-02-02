@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from config.environment import Environment
 from app_logging.app_logging import Logger
+from config.guest import GuestUserConfig
 from database.database import DatabaseSessionManager
 from database.schema.schema import Assistant, Message as ChatMessage, Conversation, User
 from auth import get_password_hash
@@ -21,8 +22,8 @@ def create_tables_for_dev(app: FastAPI):
 
         # create user
         user = User(
-            name="guest_user",
-            hashed_password=get_password_hash("guest_password"),
+            name=GuestUserConfig.name,
+            hashed_password=get_password_hash(GuestUserConfig.password),
         )
         dsm.utils.user.create(user)
 

@@ -76,6 +76,7 @@ export const apiPublic = async <T>(
             Accept: "application/json",
             ...headers,
         },
+        credentials: "include",
         mode: "cors",
     };
 

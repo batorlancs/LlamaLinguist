@@ -94,7 +94,7 @@
         --border: 152.9 0% 74.4%;
         --input: 152.9 0% 82.4%;
         --ring: 152.9 88.7% 45.3%;
-        --radius: 0.7rem;
+        --radius: 0.5rem;
         --sidebar-background: 153, 0%, 90%;
         --sidebar-foreground: 153, 0%, 7%;
         --sidebar-primary: 153, 42%, 44%;
@@ -124,7 +124,7 @@
         --border: 152.9 0% 15%;
         --input: 152.9 0% 15%;
         --ring: 152.9 88.7% 25.3%;
-        --radius: 0.7rem;
+        --radius: 0.5rem;
         --sidebar-background: 153, 0%, 9%;
         --sidebar-foreground: 153, 0%, 100%;
         --sidebar-primary: 153, 42%, 39%;

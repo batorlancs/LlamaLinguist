@@ -3,7 +3,6 @@ from typing import Any
 from fastapi.responses import JSONResponse
 from app_logging.app_logging import Logger
 from config.secrets import Secrets
-from config.environment import Environment
 from core.response import APIErrorResponse, APIResponse
 from startup import create_tables_for_dev
 from fastapi import FastAPI, HTTPException, Request, status
@@ -29,7 +28,7 @@ frontend_url = Secrets.get("FRONTEND_URL")
 # Add CORS middleware configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*" if Environment.is_development() else frontend_url],
+    allow_origins=[frontend_url],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

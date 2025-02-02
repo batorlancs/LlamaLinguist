@@ -198,7 +198,7 @@ export const Chat = () => {
                         />
                         <Button
                             size="icon"
-                            className="opacity-50 hover:bg-opacity-10 hover:opacity-100 rounded-lg"
+                            className="opacity-50 hover:opacity-100 rounded-lg hover:bg-transparent"
                             variant="ghost"
                             onClick={handleSubmit}
                         >

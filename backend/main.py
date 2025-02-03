@@ -34,6 +34,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
     return JSONResponse(
@@ -67,8 +68,13 @@ async def ping():
     return APIResponse(message="pong")
 
 
+@app.get("/health")
+async def health_check():
+    return APIResponse(message="OK")
+
+
+
 app.include_router(base_router)
 app.include_router(auth_router)
 app.include_router(assistant_router)
 app.include_router(conversation_router)
-

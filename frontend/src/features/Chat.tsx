@@ -1,13 +1,12 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ConversationWithMessages } from "@/types/api/responses";
 import { api } from "@/utils/api";
-import { Info, Loader2, Send } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 import Markdown from "./Markdown";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
 import React from "react";
+import { ChatInput } from "./ChatInput";
 
 type Chat = {
     role: "user" | "assistant";
@@ -23,6 +22,10 @@ export const CustomKbd = ({ children }: { children: React.ReactNode }) => {
 };
 
 export const Chat = () => {
+    const location = useLocation();
+    const queryParams = new URLSearchParams(location.search);
+    const inputFromUrl = queryParams.get("input");
+
     const [conversation, setConversation] =
         useState<ConversationWithMessages | null>(null);
     const [chat, setChat] = useState<Chat[]>([]);
@@ -30,8 +33,43 @@ export const Chat = () => {
     const [isLoading, setIsLoading] = useState(false);
     const { chatId: id } = useParams();
     const textareaRef = useRef<HTMLTextAreaElement>(null);
-
     const lastMessageRef = useRef<HTMLDivElement>(null);
+
+    const handleKeyDown = async (
+        e: React.KeyboardEvent<HTMLTextAreaElement>
+    ) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            await handleSubmit(input);
+        }
+    };
+
+    const handleSubmit = async (input: string) => {
+        if (input.length === 0 || input.trim().length === 0 || isLoading)
+            return;
+
+        setInput("");
+        if (textareaRef.current) {
+            textareaRef.current.style.height = "auto";
+            textareaRef.current.scrollTop = 0;
+        }
+        setIsLoading(true);
+
+        console.log("input", input);
+        addMessageToConversation({
+            role: "user",
+            content: input,
+        });
+
+        const reply = await fetchChatResponse(input);
+        addMessageToConversation({
+            role: "assistant",
+            content: reply,
+        });
+
+        setIsLoading(false);
+    };
+
     useEffect(() => {
         if (lastMessageRef.current) {
             lastMessageRef.current.scrollIntoView({ behavior: "smooth" });
@@ -41,6 +79,7 @@ export const Chat = () => {
     useEffect(() => {
         const fetchConversation = async () => {
             if (!id) return;
+            // console.log("inputFromUrl", inputFromUrl);
 
             try {
                 const response = await api<ConversationWithMessages>(
@@ -55,6 +94,17 @@ export const Chat = () => {
 
         fetchConversation();
     }, [id]);
+
+    /**
+     * If the conversation is loaded and the chat is empty and there is an input from the url,
+     * submit the input from the url to the chat.
+     */
+    useEffect(() => {
+        if (conversation && chat && chat.length === 0 && inputFromUrl) {
+            handleSubmit(inputFromUrl);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [conversation, chat, inputFromUrl]);
 
     const addMessageToConversation = (message: Chat) => {
         if (!conversation) return;
@@ -76,40 +126,6 @@ export const Chat = () => {
             console.error("Error fetching:", error);
             return "Error fetching response :(";
         }
-    };
-
-    const handleKeyDown = async (
-        e: React.KeyboardEvent<HTMLTextAreaElement>
-    ) => {
-        if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            await handleSubmit();
-        }
-    };
-
-    const handleSubmit = async () => {
-        if (input.length === 0 || input.trim().length === 0 || isLoading)
-            return;
-
-        setInput("");
-        if (textareaRef.current) {
-            textareaRef.current.style.height = "auto";
-            textareaRef.current.scrollTop = 0;
-        }
-        setIsLoading(true);
-
-        addMessageToConversation({
-            role: "user",
-            content: input,
-        });
-
-        const reply = await fetchChatResponse(input);
-        addMessageToConversation({
-            role: "assistant",
-            content: reply,
-        });
-
-        setIsLoading(false);
     };
 
     return (
@@ -180,40 +196,13 @@ export const Chat = () => {
                     </div>
                 )}
             </div>
-            <div className="w-full max-w-4xl sticky bg-background bottom-0 px-12 pb-6">
-                <div className="bg-secondary rounded-lg ring-1 ring-secondary-foreground/10 ring-offset-4 ring-offset-background">
-                    <div className="flex flex-row items-start p-2">
-                        <Textarea
-                            placeholder="Ask me anything"
-                            className="rounded-none p-0 m-2 min-h-12 max-h-96 resize-none ring-0 shadow-none ring-transparent border-0 border-transparent focus:ring-transparent focus-visible:ring-transparent scrollbar-thin scrollbar-thumb-neutral-300 dark:scrollbar-thumb-neutral-700 scrollbar-track-transparent"
-                            value={input}
-                            ref={textareaRef}
-                            onChange={(e) => {
-                                e.target.style.height = "auto";
-                                e.target.style.height =
-                                    e.target.scrollHeight + "px";
-                                setInput(e.target.value);
-                            }}
-                            onKeyDown={handleKeyDown}
-                        />
-                        <Button
-                            size="icon"
-                            className="opacity-50 hover:opacity-100 rounded-lg hover:bg-transparent"
-                            variant="ghost"
-                            onClick={handleSubmit}
-                        >
-                            <Send />
-                        </Button>
-                    </div>
-                </div>
-                <div className="text-xs text-muted-foreground mt-3 opacity-80 flex items-center gap-1.5">
-                    <Info className="w-3.5 h-3.5" />
-                    <p>
-                        Hit <CustomKbd>Enter</CustomKbd> to send,{" "}
-                        <CustomKbd>Shift + Enter</CustomKbd> for a new line
-                    </p>
-                </div>
-            </div>
+            <ChatInput
+                input={input}
+                setInput={setInput}
+                textareaRef={textareaRef}
+                handleKeyDown={handleKeyDown}
+                handleSubmit={handleSubmit}
+            />
         </>
     );
 };

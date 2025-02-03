@@ -4,6 +4,7 @@ import { Chat } from "./features/Chat";
 import { Header } from "./features/Header";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/Login";
+import { NewChat } from "./features/NewChat";
 
 // Layout component for routes that need sidebar
 const SidebarLayout = () => {
@@ -14,11 +15,11 @@ const SidebarLayout = () => {
                 <div className="w-full h-full flex flex-col items-center justify-between">
                     <Header />
                     <Routes>
+                        <Route path="/chat/new" element={<NewChat />} />
                         <Route path="/chat/:chatId" element={<Chat />} />
-                        <Route path="/chat" element={<Chat />} />
                         <Route
-                            index
-                            element={<Navigate to="/chat" replace />}
+                            path="*"
+                            element={<Navigate to="/chat/new" replace />}
                         />
                     </Routes>
                 </div>

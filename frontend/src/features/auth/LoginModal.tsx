@@ -37,7 +37,7 @@ export function LoginModal({ credentials, open, setOpen }: LoginModalProps) {
 
         try {
             await AuthService.login(username, password);
-            await navigate("/chat/1");
+            await navigate("/chat/new");
         } catch (error) {
             if (error instanceof UnauthorizedError) {
                 setError("Invalid username or password");

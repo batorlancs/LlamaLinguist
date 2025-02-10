@@ -6,12 +6,12 @@ services:
     ports:
       - "3005:3005"
     environment:
-      - BACKEND_URL=http://localhost:8000
-    depends_on:
-      backend:
-        condition: service_healthy
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - BACKEND_URL=http://backend:8000
+    # depends_on:
+    #   backend:
+    #     condition: service_healthy
+    networks:
+      - app-network
 
   backend:
     build:
@@ -20,7 +20,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - FRONTEND_URL=http://host.docker.internal:3005
+      - FRONTEND_URL=http://frontend:3005
       - OLLAMA_URL=http://host.docker.internal:11434
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/myapp
     volumes:
@@ -30,12 +30,14 @@ services:
         condition: service_healthy
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
+    # healthcheck:
+    #   test: curl --fail http://localhost:8000/health || exit 1
+    #   interval: 2s
+    #   timeout: 5s
+    #   retries: 3
+    #   start_period: 5s
+    networks:
+      - app-network
 
   db:
     image: postgres:15
@@ -52,6 +54,11 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - app-network
 
 volumes:
   postgres_data:
+networks:
+  app-network:
+    driver: bridge

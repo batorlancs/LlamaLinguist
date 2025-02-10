@@ -24,14 +24,16 @@ app = FastAPI(lifespan=lifespan)
 
 
 frontend_url = Secrets.get("FRONTEND_URL")
+# allow_origins = ["http://localhost", frontend_url, "http://host.docker.internal"]
 
 # Add CORS middleware configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[frontend_url],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+
 )
 
 
@@ -60,17 +62,13 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 @app.get("/")
 async def read_root():
-    return APIResponse(message="API is running and is healthy")
-
-
-@app.get("/ping")
-async def ping():
-    return APIResponse(message="pong")
+    return APIResponse(message="ok")
 
 
 @app.get("/health")
-async def health_check():
-    return APIResponse(message="OK")
+def health_check():
+    Logger.info("main", "Health check endpoint called")
+    return {"status": "healthy"}
 
 
 

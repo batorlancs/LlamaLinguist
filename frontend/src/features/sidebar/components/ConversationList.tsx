@@ -3,7 +3,6 @@ import {
     MessageCircle,
     MoreHorizontal,
     Pencil,
-    Plus,
     Trash2,
 } from "lucide-react";
 
@@ -24,21 +23,18 @@ import {
     useSidebar,
 } from "@/components/ui/sidebar";
 import { useNavigate } from "react-router-dom";
-import { Project } from "./app-sidebar";
-import { Button } from "./ui/button";
+import { Conversation } from "@/types/api/responses";
 
 type NavProjectsProps = {
-    projects: Project[];
+    conversations: Conversation[];
     deleteConversation: (id: number) => void;
     editConversation: (id: number) => void;
-    createConversation: () => void;
 };
 
-export function NavProjects({
-    projects,
+export function ConversationList({
+    conversations,
     deleteConversation,
     editConversation,
-    createConversation,
 }: NavProjectsProps) {
     const { isMobile } = useSidebar();
     const navigate = useNavigate();
@@ -46,19 +42,13 @@ export function NavProjects({
 
     return (
         <SidebarGroup>
-            <SidebarGroupLabel className="flex items-center justify-between">
-                Conversations
-                <Button
-                    onClick={createConversation}
-                    className="h-5 w-5"
-                    size="icon"
-                    variant="outline"
-                >
-                    <Plus />
-                </Button>
-            </SidebarGroupLabel>
+            {conversations && conversations.length == 0 ? (
+                <SidebarGroupLabel>No conversations</SidebarGroupLabel>
+            ) : (
+                <SidebarGroupLabel>Recent</SidebarGroupLabel>
+            )}
             <SidebarMenu>
-                {projects.map((item) => (
+                {conversations?.map((item) => (
                     <SidebarMenuItem key={item.id}>
                         <SidebarMenuButton
                             asChild
@@ -71,7 +61,7 @@ export function NavProjects({
                         >
                             <div>
                                 <MessageCircle />
-                                <span>{item.name}</span>
+                                <span>{item.title}</span>
                             </div>
                         </SidebarMenuButton>
                         <DropdownMenu>

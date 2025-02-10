@@ -19,9 +19,15 @@ type ThemeOption = {
 
 type ThemeList = ThemeOption[];
 
+/**
+ * Mode toggle to switch between light and dark mode
+ */
 export function ModeToggle() {
     const { theme, setTheme } = useTheme();
 
+    /**
+     * List of themes to choose from
+     */
     const themeList: ThemeList = [
         {
             name: "Light",

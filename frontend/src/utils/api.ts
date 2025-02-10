@@ -33,7 +33,10 @@ export const api = async <T>(
             requestOptions.body = JSON.stringify(body);
         }
 
-        const response = await fetch(`${API_URL}${endpoint}`, requestOptions);
+        const response = await fetch(
+            `${API_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`,
+            requestOptions
+        );
         // Handle errors
         if (response.status === 401) throw new UnauthorizedError();
         if (!response.ok) throw new HttpError(response.status);

@@ -4,6 +4,14 @@ import { ApiResponse, RequestOptions } from "./types";
 
 const API_URL = import.meta.env.BACKEND_URL || "http://localhost:8000";
 
+/**
+ * Generic API request function.
+ * @template T The type of the response data.
+ * @param endpoint The endpoint to call.
+ * @param options The request options.
+ * @param retry Whether to retry the request if it fails with a 401 error.
+ * @returns The API response.
+ */
 export const api = async <T>(
     endpoint: string,
     options: RequestOptions = {},

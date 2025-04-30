@@ -6,7 +6,10 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/Login";
 import { NewChat } from "./features/NewChat";
 
-// Layout component for routes that need sidebar
+/**
+ * Layout component for routes that need sidebar
+ * This component wraps the sidebar and the main content area
+ */
 const SidebarLayout = () => {
     return (
         <SidebarProvider>
